@@ -1,0 +1,30 @@
+---
+Language: Cpp
+BasedOnStyle: LLVM
+
+# ColumnLimit 0 keeps the hand-chosen line breaks in the loader sources; the
+# formatter enforces indentation, spacing and pointer placement only.
+ColumnLimit: 0
+
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ContinuationIndentWidth: 4
+AccessModifierOffset: -4
+NamespaceIndentation: None
+BreakBeforeBraces: Attach
+AlignAfterOpenBracket: DontAlign
+AlignOperands: DontAlign
+BreakBeforeBinaryOperators: None
+PointerAlignment: Left
+ReferenceAlignment: Left
+AllowShortFunctionsOnASingleLine: All
+AllowShortIfStatementsOnASingleLine: WithoutElse
+AllowShortLoopsOnASingleLine: true
+AlwaysBreakTemplateDeclarations: Yes
+BreakStringLiterals: false
+Cpp11BracedListStyle: true
+FixNamespaceComments: true
+IndentCaseLabels: false
+SortIncludes: false
+...

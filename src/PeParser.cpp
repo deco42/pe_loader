@@ -1,5 +1,6 @@
 #include "PeInternal.hpp"
 
+#include <algorithm>
 #include <cstring>
 #include <limits>
 #include <sstream>
@@ -15,6 +16,12 @@ T readObject(std::span<const std::byte> bytes, std::size_t offset, PeErrorCode c
     T value{};
     std::memcpy(&value, bytes.data() + offset, sizeof(T));
     return value;
+}
+
+bool hasDirectory(const ParsedImage& image, std::size_t index) noexcept {
+    return image.nt.OptionalHeader.NumberOfRvaAndSizes > index &&
+        image.nt.OptionalHeader.DataDirectory[index].VirtualAddress != 0 &&
+        image.nt.OptionalHeader.DataDirectory[index].Size != 0;
 }
 
 } // namespace
@@ -118,6 +125,24 @@ ParsedImage parseImage(std::span<const std::byte> image) {
     }
 
     return result;
+}
+
+ImageInfo toImageInfo(const ParsedImage& image) {
+    ImageInfo info;
+    const auto& optional = image.nt.OptionalHeader;
+    info.preferredImageBase = optional.ImageBase;
+    info.imageSize = optional.SizeOfImage;
+    info.headerSize = optional.SizeOfHeaders;
+    info.entryPointRva = optional.AddressOfEntryPoint;
+    info.hasRelocations = hasDirectory(image, IMAGE_DIRECTORY_ENTRY_BASERELOC);
+    info.hasImports = hasDirectory(image, IMAGE_DIRECTORY_ENTRY_IMPORT);
+    for (const auto& section : image.sections) {
+        const auto* nameBegin = reinterpret_cast<const char*>(section.Name);
+        const auto* nameEnd = std::find(nameBegin, nameBegin + IMAGE_SIZEOF_SHORT_NAME, '\0');
+        info.sections.push_back({std::string(nameBegin, nameEnd), section.VirtualAddress, section.Misc.VirtualSize,
+            section.SizeOfRawData, section.Characteristics});
+    }
+    return info;
 }
 
 } // namespace pe::detail

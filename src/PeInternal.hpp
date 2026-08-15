@@ -1,6 +1,7 @@
 #pragma once
 
 #include "pe_loader/PeError.hpp"
+#include "pe_loader/PeImage.hpp"
 
 #include <Windows.h>
 
@@ -24,6 +25,7 @@ struct ParsedImage {
 
 [[noreturn]] void fail(PeErrorCode code, std::string message, DWORD systemError = 0);
 [[nodiscard]] ParsedImage parseImage(std::span<const std::byte> image);
+[[nodiscard]] ImageInfo toImageInfo(const ParsedImage& image);
 
 [[nodiscard]] bool checkedRange(std::size_t offset, std::size_t length, std::size_t total) noexcept;
 [[nodiscard]] std::span<const std::byte> fileSpan(

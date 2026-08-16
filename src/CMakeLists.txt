@@ -4,6 +4,7 @@ add_library(PeLoader::PeLoader ALIAS pe_loader)
 target_sources(pe_loader
     PRIVATE
         PeParser.cpp
+        ImageMapper.cpp
 )
 
 target_include_directories(pe_loader

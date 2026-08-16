@@ -14,7 +14,8 @@ enum class PeErrorCode {
     UnsupportedImageType,
     InvalidOptionalHeader,
     ImageTooLarge,
-    InvalidSection
+    InvalidSection,
+    AllocationFailed
 };
 
 class PeError final : public std::runtime_error {

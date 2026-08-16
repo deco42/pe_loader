@@ -46,6 +46,47 @@ std::span<const std::byte> fileSpan(
     return image.file.subspan(offset, length);
 }
 
+std::span<std::byte> mappedSpan(
+    ModuleState& state,
+    std::uint32_t rva,
+    std::size_t length,
+    PeErrorCode code,
+    std::string_view context) {
+    if (state.base == nullptr || !checkedRange(rva, length, state.size)) {
+        fail(code, std::string(context) + " is outside the mapped image");
+    }
+    return {state.base + rva, length};
+}
+
+std::span<const std::byte> mappedSpan(
+    const ModuleState& state,
+    std::uint32_t rva,
+    std::size_t length,
+    PeErrorCode code,
+    std::string_view context) {
+    if (state.base == nullptr || !checkedRange(rva, length, state.size)) {
+        fail(code, std::string(context) + " is outside the mapped image");
+    }
+    return {state.base + rva, length};
+}
+
+std::string mappedString(
+    const ModuleState& state,
+    std::uint32_t rva,
+    PeErrorCode code,
+    std::string_view context) {
+    if (state.base == nullptr || rva >= state.size) {
+        fail(code, std::string(context) + " starts outside the mapped image");
+    }
+    const char* begin = reinterpret_cast<const char*>(state.base + rva);
+    const std::size_t remaining = state.size - rva;
+    const void* terminator = std::memchr(begin, '\0', remaining);
+    if (terminator == nullptr) {
+        fail(code, std::string(context) + " is not null terminated inside the mapped image");
+    }
+    return std::string(begin, static_cast<const char*>(terminator));
+}
+
 ParsedImage parseImage(std::span<const std::byte> image) {
     if (image.data() == nullptr || image.empty()) {
         fail(PeErrorCode::InvalidArgument, "The PE image buffer is empty");
@@ -143,6 +184,39 @@ ImageInfo toImageInfo(const ParsedImage& image) {
             section.SizeOfRawData, section.Characteristics});
     }
     return info;
+}
+
+const IMAGE_NT_HEADERS64& mappedNt(const ModuleState& state) {
+    const auto* dos = mappedObject<IMAGE_DOS_HEADER>(state, 0, PeErrorCode::InvalidNtHeader, "Mapped DOS header");
+    if (dos->e_lfanew < 0) {
+        fail(PeErrorCode::InvalidNtHeader, "Mapped DOS e_lfanew is negative");
+    }
+    const auto* nt = mappedObject<IMAGE_NT_HEADERS64>(
+        state, static_cast<std::uint32_t>(dos->e_lfanew), PeErrorCode::InvalidNtHeader, "Mapped NT headers");
+    return *nt;
+}
+
+IMAGE_NT_HEADERS64& mappedNt(ModuleState& state) {
+    return const_cast<IMAGE_NT_HEADERS64&>(mappedNt(static_cast<const ModuleState&>(state)));
+}
+
+IMAGE_DATA_DIRECTORY directory(const ModuleState& state, std::size_t index) {
+    const auto& optional = mappedNt(state).OptionalHeader;
+    if (index >= optional.NumberOfRvaAndSizes || index >= IMAGE_NUMBEROF_DIRECTORY_ENTRIES) {
+        return {};
+    }
+    return optional.DataDirectory[index];
+}
+
+void log(std::string_view message) noexcept {
+#if defined(PELOADER_VERBOSE_LOGGING)
+    std::string line = "[PE] ";
+    line.append(message);
+    line.push_back('\n');
+    ::OutputDebugStringA(line.c_str());
+#else
+    (void)message;
+#endif
 }
 
 } // namespace pe::detail

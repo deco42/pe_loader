@@ -15,6 +15,7 @@ enum class PeErrorCode {
     InvalidOptionalHeader,
     ImageTooLarge,
     InvalidSection,
+    InvalidDataDirectory,
     AllocationFailed
 };
 

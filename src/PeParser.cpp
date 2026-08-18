@@ -18,6 +18,10 @@ T readObject(std::span<const std::byte> bytes, std::size_t offset, PeErrorCode c
     return value;
 }
 
+bool isPowerOfTwo(std::uint32_t value) noexcept {
+    return value != 0 && (value & (value - 1)) == 0;
+}
+
 bool hasDirectory(const ParsedImage& image, std::size_t index) noexcept {
     return image.nt.OptionalHeader.NumberOfRvaAndSizes > index &&
         image.nt.OptionalHeader.DataDirectory[index].VirtualAddress != 0 &&
@@ -130,6 +134,9 @@ ParsedImage parseImage(std::span<const std::byte> image) {
     if (optional.Magic != IMAGE_NT_OPTIONAL_HDR64_MAGIC) {
         fail(PeErrorCode::UnsupportedArchitecture, "Only PE32+ optional headers are supported");
     }
+    if (optional.NumberOfRvaAndSizes > IMAGE_NUMBEROF_DIRECTORY_ENTRIES) {
+        fail(PeErrorCode::InvalidOptionalHeader, "NumberOfRvaAndSizes exceeds the supported PE directory count");
+    }
     if (optional.SizeOfImage == 0 || optional.SizeOfImage > kMaximumImageSize) {
         fail(PeErrorCode::ImageTooLarge, "SizeOfImage is zero or exceeds 2 GiB");
     }
@@ -137,6 +144,17 @@ ParsedImage parseImage(std::span<const std::byte> image) {
         optional.SizeOfHeaders > image.size()) {
         fail(PeErrorCode::InvalidOptionalHeader, "SizeOfHeaders is outside the file or image");
     }
+    if (!isPowerOfTwo(optional.FileAlignment) || !isPowerOfTwo(optional.SectionAlignment) ||
+        optional.FileAlignment > 65536 ||
+        (optional.SectionAlignment < 4096 && optional.SectionAlignment != optional.FileAlignment) ||
+        (optional.SectionAlignment >= 4096 && optional.FileAlignment < 512) ||
+        optional.SectionAlignment < optional.FileAlignment) {
+        fail(PeErrorCode::InvalidOptionalHeader, "Invalid SectionAlignment/FileAlignment combination");
+    }
+    if (optional.AddressOfEntryPoint != 0 && optional.AddressOfEntryPoint >= optional.SizeOfImage) {
+        fail(PeErrorCode::InvalidOptionalHeader, "AddressOfEntryPoint is outside the image");
+    }
+
     const std::size_t sectionOffset = optionalOffset + fileHeader.SizeOfOptionalHeader;
     const std::size_t sectionBytes = static_cast<std::size_t>(fileHeader.NumberOfSections) * sizeof(IMAGE_SECTION_HEADER);
     if (!checkedRange(sectionOffset, sectionBytes, image.size()) || sectionOffset + sectionBytes > optional.SizeOfHeaders) {
@@ -165,6 +183,22 @@ ParsedImage parseImage(std::span<const std::byte> image) {
         result.sections.push_back(section);
     }
 
+    for (std::size_t i = 0; i < optional.NumberOfRvaAndSizes; ++i) {
+        const auto& dir = optional.DataDirectory[i];
+        if (dir.VirtualAddress == 0 && dir.Size == 0) {
+            continue;
+        }
+        if (dir.VirtualAddress == 0 || dir.Size == 0) {
+            fail(PeErrorCode::InvalidDataDirectory, "A data directory has only one of RVA/Size set");
+        }
+        if (i == IMAGE_DIRECTORY_ENTRY_SECURITY) {
+            if (!checkedRange(dir.VirtualAddress, dir.Size, image.size())) {
+                fail(PeErrorCode::InvalidDataDirectory, "Certificate table exceeds the input file");
+            }
+        } else if (dir.VirtualAddress >= optional.SizeOfImage || dir.Size > optional.SizeOfImage - dir.VirtualAddress) {
+            fail(PeErrorCode::InvalidDataDirectory, "A data directory exceeds SizeOfImage");
+        }
+    }
     return result;
 }
 

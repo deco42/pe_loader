@@ -35,7 +35,7 @@ bool hasDirectory(const ParsedImage& image, std::size_t index) noexcept {
 }
 
 bool checkedRange(std::size_t offset, std::size_t length, std::size_t total) noexcept {
-    return offset + length <= total;
+    return offset <= total && length <= total - offset;
 }
 
 std::span<const std::byte> fileSpan(

@@ -64,6 +64,7 @@ template <typename T>
 [[nodiscard]] IMAGE_DATA_DIRECTORY directory(const ModuleState& state, std::size_t index);
 
 void allocateAndMap(const ParsedImage& image, ModuleState& state);
+void applyRelocations(ModuleState& state);
 
 void log(std::string_view message) noexcept;
 

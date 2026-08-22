@@ -16,7 +16,10 @@ enum class PeErrorCode {
     ImageTooLarge,
     InvalidSection,
     InvalidDataDirectory,
-    AllocationFailed
+    AllocationFailed,
+    RelocationRequiredButUnavailable,
+    InvalidRelocationDirectory,
+    UnsupportedRelocation
 };
 
 class PeError final : public std::runtime_error {

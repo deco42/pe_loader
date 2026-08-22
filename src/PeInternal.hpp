@@ -23,12 +23,18 @@ struct ParsedImage {
     std::vector<IMAGE_SECTION_HEADER> sections;
 };
 
+struct Dependency {
+    std::string name;
+    HMODULE handle{};
+};
+
 struct ModuleState {
     std::byte* base{};
     std::size_t size{};
     std::uint64_t preferredBase{};
     std::uint32_t entryPointRva{};
     std::vector<IMAGE_SECTION_HEADER> sections;
+    std::vector<Dependency> dependencies;
 };
 
 [[noreturn]] void fail(PeErrorCode code, std::string message, DWORD systemError = 0);
@@ -65,6 +71,7 @@ template <typename T>
 
 void allocateAndMap(const ParsedImage& image, ModuleState& state);
 void applyRelocations(ModuleState& state);
+void resolveImports(ModuleState& state);
 
 void log(std::string_view message) noexcept;
 

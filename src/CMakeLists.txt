@@ -6,6 +6,7 @@ target_sources(pe_loader
         PeParser.cpp
         ImageMapper.cpp
         Relocations.cpp
+        Imports.cpp
 )
 
 target_include_directories(pe_loader

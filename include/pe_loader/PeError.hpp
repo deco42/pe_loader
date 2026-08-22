@@ -19,7 +19,10 @@ enum class PeErrorCode {
     AllocationFailed,
     RelocationRequiredButUnavailable,
     InvalidRelocationDirectory,
-    UnsupportedRelocation
+    UnsupportedRelocation,
+    ImportModuleNotFound,
+    ImportSymbolNotFound,
+    InvalidImportDirectory
 };
 
 class PeError final : public std::runtime_error {

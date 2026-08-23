@@ -22,7 +22,9 @@ enum class PeErrorCode {
     UnsupportedRelocation,
     ImportModuleNotFound,
     ImportSymbolNotFound,
-    InvalidImportDirectory
+    InvalidImportDirectory,
+    InvalidExportDirectory,
+    ExportNotFound
 };
 
 class PeError final : public std::runtime_error {

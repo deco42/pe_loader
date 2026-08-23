@@ -1,7 +1,6 @@
 #pragma once
 
-#include "pe_loader/PeError.hpp"
-#include "pe_loader/PeImage.hpp"
+#include "pe_loader/PeLoader.hpp"
 
 #include <Windows.h>
 
@@ -35,6 +34,7 @@ struct ModuleState {
     std::uint32_t entryPointRva{};
     std::vector<IMAGE_SECTION_HEADER> sections;
     std::vector<Dependency> dependencies;
+    bool dllAttached{};
 };
 
 [[noreturn]] void fail(PeErrorCode code, std::string message, DWORD systemError = 0);
@@ -72,7 +72,20 @@ template <typename T>
 void allocateAndMap(const ParsedImage& image, ModuleState& state);
 void applyRelocations(ModuleState& state);
 void resolveImports(ModuleState& state);
+void applyFinalProtections(ModuleState& state);
+[[nodiscard]] void* resolveExport(ModuleState& state, const char* name);
+[[nodiscard]] void* resolveExport(ModuleState& state, std::uint16_t ordinal);
+void unload(ModuleState& state) noexcept;
 
 void log(std::string_view message) noexcept;
 
 } // namespace pe::detail
+
+namespace pe {
+
+struct LoadedModule::Impl {
+    detail::ModuleState state;
+    ~Impl() { detail::unload(state); }
+};
+
+} // namespace pe

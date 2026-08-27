@@ -23,8 +23,10 @@ enum class PeErrorCode {
     ImportModuleNotFound,
     ImportSymbolNotFound,
     InvalidImportDirectory,
+    MemoryProtectionFailed,
     InvalidExportDirectory,
-    ExportNotFound
+    ExportNotFound,
+    WindowsApiFailure
 };
 
 class PeError final : public std::runtime_error {

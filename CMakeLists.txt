@@ -16,8 +16,32 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+include(CTest)
+
+option(PELOADER_BUILD_TESTS "Build PE loader tests and fixture DLLs" ON)
+set(PELOADER_MSVC_RUNTIME "STATIC" CACHE STRING "MSVC runtime for the loader and test driver: STATIC or DYNAMIC")
+set_property(CACHE PELOADER_MSVC_RUNTIME PROPERTY STRINGS STATIC DYNAMIC)
+
+if(NOT PELOADER_MSVC_RUNTIME MATCHES "^(STATIC|DYNAMIC)$")
+    message(FATAL_ERROR "PELOADER_MSVC_RUNTIME must be STATIC or DYNAMIC")
+endif()
+
+function(pe_apply_runtime target runtime_kind)
+    if(runtime_kind STREQUAL "STATIC")
+        set_property(TARGET ${target} PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+    elseif(runtime_kind STREQUAL "DYNAMIC")
+        set_property(TARGET ${target} PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
+    else()
+        message(FATAL_ERROR "Unknown runtime kind: ${runtime_kind}")
+    endif()
+endfunction()
+
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 
 add_subdirectory(src)
+
+if(BUILD_TESTING AND PELOADER_BUILD_TESTS)
+    add_subdirectory(tests)
+endif()

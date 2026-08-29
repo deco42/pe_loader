@@ -25,3 +25,4 @@ target_compile_definitions(pe_loader
 )
 target_compile_options(pe_loader PRIVATE /W4 /permissive- /EHsc /utf-8)
 target_link_libraries(pe_loader PUBLIC ntdll)
+pe_apply_runtime(pe_loader ${PELOADER_MSVC_RUNTIME})

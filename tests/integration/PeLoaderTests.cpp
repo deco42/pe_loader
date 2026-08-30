@@ -76,6 +76,24 @@ int basic(const std::filesystem::path& path) {
     return 0;
 }
 
+int relocation(const std::filesystem::path& path) {
+    const auto bytes = readFile(path);
+    const auto info = pe::PeLoader::inspect(bytes);
+    void* blocker = ::VirtualAlloc(reinterpret_cast<void*>(static_cast<std::uintptr_t>(info.preferredImageBase)),
+        info.imageSize, MEM_RESERVE, PAGE_NOACCESS);
+    auto module = pe::PeLoader::load(bytes);
+    require(reinterpret_cast<std::uintptr_t>(module.baseAddress()) != info.preferredImageBase,
+        "The relocation test did not force a non-preferred base");
+    if (blocker != nullptr) ::VirtualFree(blocker, 0, MEM_RELEASE);
+    require(module.getExport<std::uint64_t (*)()>("RelocationValue")() == 0x123456789abcdef0ULL,
+        "DIR64 relocation produced the wrong global value");
+    const auto pointer = module.getExport<const void* (*)()>("RelocationPointer")();
+    const auto begin = reinterpret_cast<std::uintptr_t>(module.baseAddress());
+    const auto value = reinterpret_cast<std::uintptr_t>(pointer);
+    require(value >= begin && value < begin + module.imageSize(), "Relocated pointer lies outside the image");
+    return 0;
+}
+
 int repeated(const std::filesystem::path& path) {
     const auto bytes = readFile(path);
     for (int i = 0; i < 100; ++i) {
@@ -108,6 +126,21 @@ int invalid(const std::filesystem::path& path) {
     std::memcpy(&dos, mutation.data(), sizeof(dos));
     dos.e_lfanew = LONG_MAX;
     std::memcpy(mutation.data(), &dos, sizeof(dos));
+    mustReject(mutation);
+
+    auto ntHeaders = [](std::vector<std::byte>& bytes) -> IMAGE_NT_HEADERS64* {
+        auto* mutableDos = reinterpret_cast<IMAGE_DOS_HEADER*>(bytes.data());
+        return reinterpret_cast<IMAGE_NT_HEADERS64*>(bytes.data() + mutableDos->e_lfanew);
+    };
+
+    mutation = valid;
+    ntHeaders(mutation)->OptionalHeader.SizeOfImage = 0;
+    mustReject(mutation);
+    mutation = valid;
+    ntHeaders(mutation)->FileHeader.NumberOfSections = 0xffff;
+    mustReject(mutation);
+    mutation = valid;
+    IMAGE_FIRST_SECTION(ntHeaders(mutation))->PointerToRawData = UINT32_MAX;
     mustReject(mutation);
 
     std::mt19937 generator(0x5045);
@@ -144,6 +177,7 @@ int wmain(int argc, wchar_t** argv) {
         const std::string mode = std::filesystem::path(argv[1]).string();
         const std::filesystem::path path = argv[2];
         if (mode == "basic") return basic(path);
+        if (mode == "relocation") return relocation(path);
         if (mode == "repeat") return repeated(path);
         if (mode == "invalid") return invalid(path);
         if (mode == "parallel") return parallel(path);

@@ -12,6 +12,7 @@
 #include <future>
 #include <iostream>
 #include <iterator>
+#include <random>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -85,6 +86,39 @@ int repeated(const std::filesystem::path& path) {
     return 0;
 }
 
+int invalid(const std::filesystem::path& path) {
+    const auto valid = readFile(path);
+    auto mustReject = [](const std::vector<std::byte>& bytes) {
+        try {
+            (void)pe::PeLoader::inspect(bytes);
+        } catch (const pe::PeError&) {
+            return;
+        }
+        throw std::runtime_error("Malformed PE input was accepted");
+    };
+    mustReject({});
+    for (std::size_t length = 1; length < (std::min<std::size_t>)(valid.size(), 1024); length += 17) {
+        mustReject(std::vector<std::byte>(valid.begin(), valid.begin() + length));
+    }
+    auto mutation = valid;
+    mutation[0] = std::byte{0};
+    mustReject(mutation);
+    mutation = valid;
+    IMAGE_DOS_HEADER dos{};
+    std::memcpy(&dos, mutation.data(), sizeof(dos));
+    dos.e_lfanew = LONG_MAX;
+    std::memcpy(mutation.data(), &dos, sizeof(dos));
+    mustReject(mutation);
+
+    std::mt19937 generator(0x5045);
+    for (int sample = 0; sample < 64; ++sample) {
+        std::vector<std::byte> random(static_cast<std::size_t>(sample * 13 + 1));
+        for (auto& value : random) value = static_cast<std::byte>(generator() & 0xff);
+        mustReject(random);
+    }
+    return 0;
+}
+
 int parallel(const std::filesystem::path& path) {
     const auto bytes = readFile(path);
     std::vector<std::future<int>> tasks;
@@ -111,6 +145,7 @@ int wmain(int argc, wchar_t** argv) {
         const std::filesystem::path path = argv[2];
         if (mode == "basic") return basic(path);
         if (mode == "repeat") return repeated(path);
+        if (mode == "invalid") return invalid(path);
         if (mode == "parallel") return parallel(path);
         throw std::runtime_error("Unknown test mode: " + mode);
     } catch (const pe::PeError& error) {

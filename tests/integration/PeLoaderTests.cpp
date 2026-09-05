@@ -94,6 +94,14 @@ int relocation(const std::filesystem::path& path) {
     return 0;
 }
 
+int namedImport(const std::filesystem::path& path) {
+    NativeModule native(path);
+    require(native.get<int (*)()>("UseNamedImport")() == 43, "Native named import failed");
+    auto module = pe::PeLoader::load(readFile(path));
+    require(module.getExport<int (*)()>("UseNamedImport")() == 43, "Manual named import failed");
+    return 0;
+}
+
 int repeated(const std::filesystem::path& path) {
     const auto bytes = readFile(path);
     for (int i = 0; i < 100; ++i) {
@@ -132,6 +140,25 @@ int invalid(const std::filesystem::path& path) {
         auto* mutableDos = reinterpret_cast<IMAGE_DOS_HEADER*>(bytes.data());
         return reinterpret_cast<IMAGE_NT_HEADERS64*>(bytes.data() + mutableDos->e_lfanew);
     };
+    auto mustRejectLoad = [&](const std::vector<std::byte>& bytes, std::string_view label, bool blockPreferred = false) {
+        void* blocker{};
+        if (blockPreferred) {
+            const auto info = pe::PeLoader::inspect(bytes);
+            blocker = ::VirtualAlloc(
+                reinterpret_cast<void*>(static_cast<std::uintptr_t>(info.preferredImageBase)),
+                info.imageSize, MEM_RESERVE, PAGE_NOACCESS);
+            require(blocker != nullptr, "Could not reserve the preferred base for malformed relocation test");
+        }
+        try {
+            auto module = pe::PeLoader::load(bytes);
+            (void)module;
+        } catch (const pe::PeError&) {
+            if (blocker != nullptr) ::VirtualFree(blocker, 0, MEM_RELEASE);
+            return;
+        }
+        if (blocker != nullptr) ::VirtualFree(blocker, 0, MEM_RELEASE);
+        throw std::runtime_error("Malformed mapped PE input was accepted: " + std::string(label));
+    };
 
     mutation = valid;
     ntHeaders(mutation)->OptionalHeader.SizeOfImage = 0;
@@ -142,6 +169,10 @@ int invalid(const std::filesystem::path& path) {
     mutation = valid;
     IMAGE_FIRST_SECTION(ntHeaders(mutation))->PointerToRawData = UINT32_MAX;
     mustReject(mutation);
+    mutation = valid;
+    auto& badImport = ntHeaders(mutation)->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
+    badImport.Size = 1;
+    mustRejectLoad(mutation, "short import directory");
 
     std::mt19937 generator(0x5045);
     for (int sample = 0; sample < 64; ++sample) {
@@ -178,6 +209,7 @@ int wmain(int argc, wchar_t** argv) {
         const std::filesystem::path path = argv[2];
         if (mode == "basic") return basic(path);
         if (mode == "relocation") return relocation(path);
+        if (mode == "import") return namedImport(path);
         if (mode == "repeat") return repeated(path);
         if (mode == "invalid") return invalid(path);
         if (mode == "parallel") return parallel(path);

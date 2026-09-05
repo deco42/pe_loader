@@ -32,19 +32,25 @@ void resolveThunkTable(
 
         FARPROC address{};
         std::string symbol;
-        if (value > UINT32_MAX) {
-            fail(invalidCode, "Import-by-name RVA exceeds 32 bits");
+        if (IMAGE_SNAP_BY_ORDINAL64(value)) {
+            const WORD ordinal = IMAGE_ORDINAL64(value);
+            symbol = "#" + std::to_string(ordinal);
+            address = ::GetProcAddress(module, MAKEINTRESOURCEA(ordinal));
+        } else {
+            if (value > UINT32_MAX) {
+                fail(invalidCode, "Import-by-name RVA exceeds 32 bits");
+            }
+            const auto* importName = mappedObject<IMAGE_IMPORT_BY_NAME>(
+                state, static_cast<std::uint32_t>(value), invalidCode, "Import-by-name record");
+            (void)importName;
+            if (value > UINT32_MAX - offsetof(IMAGE_IMPORT_BY_NAME, Name)) {
+                fail(invalidCode, "Import name RVA overflows");
+            }
+            symbol = mappedString(
+                state, static_cast<std::uint32_t>(value + offsetof(IMAGE_IMPORT_BY_NAME, Name)),
+                invalidCode, "Imported symbol name");
+            address = ::GetProcAddress(module, symbol.c_str());
         }
-        const auto* importName = mappedObject<IMAGE_IMPORT_BY_NAME>(
-            state, static_cast<std::uint32_t>(value), invalidCode, "Import-by-name record");
-        (void)importName;
-        if (value > UINT32_MAX - offsetof(IMAGE_IMPORT_BY_NAME, Name)) {
-            fail(invalidCode, "Import name RVA overflows");
-        }
-        symbol = mappedString(
-            state, static_cast<std::uint32_t>(value + offsetof(IMAGE_IMPORT_BY_NAME, Name)),
-            invalidCode, "Imported symbol name");
-        address = ::GetProcAddress(module, symbol.c_str());
         if (address == nullptr) {
             fail(PeErrorCode::ImportSymbolNotFound,
                 "Import resolution failed: " + moduleName + "!" + symbol, ::GetLastError());

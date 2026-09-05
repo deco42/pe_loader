@@ -102,6 +102,14 @@ int namedImport(const std::filesystem::path& path) {
     return 0;
 }
 
+int ordinalImport(const std::filesystem::path& path) {
+    NativeModule native(path);
+    require(native.get<int (*)()>("UseOrdinalImport")() == 42, "Native ordinal import failed");
+    auto module = pe::PeLoader::load(readFile(path));
+    require(module.getExport<int (*)()>("UseOrdinalImport")() == 42, "Manual ordinal import failed");
+    return 0;
+}
+
 int repeated(const std::filesystem::path& path) {
     const auto bytes = readFile(path);
     for (int i = 0; i < 100; ++i) {
@@ -210,6 +218,7 @@ int wmain(int argc, wchar_t** argv) {
         if (mode == "basic") return basic(path);
         if (mode == "relocation") return relocation(path);
         if (mode == "import") return namedImport(path);
+        if (mode == "ordinal") return ordinalImport(path);
         if (mode == "repeat") return repeated(path);
         if (mode == "invalid") return invalid(path);
         if (mode == "parallel") return parallel(path);

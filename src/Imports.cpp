@@ -89,7 +89,9 @@ void resolveImports(ModuleState& state) {
                 "Import module could not be loaded: " + moduleName, ::GetLastError());
         }
         state.dependencies.push_back({moduleName, module});
-        const std::uint32_t lookupRva = descriptor.OriginalFirstThunk;
+        const std::uint32_t lookupRva = descriptor.OriginalFirstThunk != 0
+            ? descriptor.OriginalFirstThunk
+            : descriptor.FirstThunk;
         resolveThunkTable(
             state, module, moduleName, lookupRva, descriptor.FirstThunk,
             PeErrorCode::InvalidImportDirectory);

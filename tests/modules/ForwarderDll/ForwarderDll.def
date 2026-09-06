@@ -1,0 +1,2 @@
+EXPORTS
+    ForwardedSleep=KERNEL32.Sleep

@@ -110,6 +110,14 @@ int ordinalImport(const std::filesystem::path& path) {
     return 0;
 }
 
+int forwarded(const std::filesystem::path& path) {
+    NativeModule native(path);
+    native.get<void(WINAPI*)(DWORD)>("ForwardedSleep")(0);
+    auto module = pe::PeLoader::load(readFile(path));
+    module.getExport<void(WINAPI*)(DWORD)>("ForwardedSleep")(0);
+    return 0;
+}
+
 int repeated(const std::filesystem::path& path) {
     const auto bytes = readFile(path);
     for (int i = 0; i < 100; ++i) {
@@ -219,6 +227,7 @@ int wmain(int argc, wchar_t** argv) {
         if (mode == "relocation") return relocation(path);
         if (mode == "import") return namedImport(path);
         if (mode == "ordinal") return ordinalImport(path);
+        if (mode == "forwarded") return forwarded(path);
         if (mode == "repeat") return repeated(path);
         if (mode == "invalid") return invalid(path);
         if (mode == "parallel") return parallel(path);

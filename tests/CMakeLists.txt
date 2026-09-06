@@ -21,6 +21,9 @@ pe_test_dll(OrdinalDependencyDll
     modules/OrdinalDependencyDll/OrdinalDependencyDll.def)
 pe_test_dll(OrdinalImportDll modules/OrdinalImportDll/OrdinalImportDll.cpp)
 target_link_libraries(OrdinalImportDll PRIVATE OrdinalDependencyDll)
+pe_test_dll(ForwarderDll
+    modules/ForwarderDll/ForwarderDll.cpp
+    modules/ForwarderDll/ForwarderDll.def)
 
 add_executable(pe_loader_tests integration/PeLoaderTests.cpp)
 target_link_libraries(pe_loader_tests PRIVATE PeLoader::PeLoader)
@@ -47,6 +50,7 @@ pe_add_module_test(PeLoader.BasicDllMd basic BasicDllMd)
 pe_add_module_test(PeLoader.Relocation relocation RelocationDll)
 pe_add_module_test(PeLoader.ImportByName import ImportDll)
 pe_add_module_test(PeLoader.ImportByOrdinal ordinal OrdinalImportDll)
+pe_add_module_test(PeLoader.ForwardedExport forwarded ForwarderDll)
 pe_add_module_test(PeLoader.RepeatedLoadUnload repeat BasicDll)
 pe_add_module_test(PeLoader.InvalidPe invalid BasicDll)
 pe_add_module_test(PeLoader.ParallelLoad parallel BasicDll)

@@ -21,9 +21,50 @@ std::uint32_t addRva(std::uint32_t base, std::size_t offset, PeErrorCode code) {
     return static_cast<std::uint32_t>(base + offset);
 }
 
+void* resolveForwarder(ModuleState& state, std::uint32_t functionRva, IMAGE_DATA_DIRECTORY exportDirectory) {
+    const std::string forwarder = mappedString(
+        state, functionRva, PeErrorCode::InvalidExportDirectory, "Forwarded export string");
+    const auto separator = forwarder.rfind('.');
+    if (separator == std::string::npos || separator == 0 || separator + 1 >= forwarder.size()) {
+        fail(PeErrorCode::InvalidExportDirectory, "Forwarded export has an invalid module.symbol form");
+    }
+    std::string moduleName = forwarder.substr(0, separator);
+    if (moduleName.find('.') == std::string::npos) moduleName += ".dll";
+    HMODULE module = ::LoadLibraryA(moduleName.c_str());
+    if (module == nullptr) {
+        fail(PeErrorCode::ImportModuleNotFound,
+            "Forwarded export module could not be loaded: " + moduleName, ::GetLastError());
+    }
+    FARPROC target{};
+    const std::string symbol = forwarder.substr(separator + 1);
+    if (!symbol.empty() && symbol.front() == '#') {
+        char* end{};
+        const unsigned long ordinal = std::strtoul(symbol.c_str() + 1, &end, 10);
+        if (end == nullptr || *end != '\0' || ordinal > 0xffff) {
+            ::FreeLibrary(module);
+            fail(PeErrorCode::InvalidExportDirectory, "Forwarded export ordinal is invalid");
+        }
+        target = ::GetProcAddress(module, MAKEINTRESOURCEA(static_cast<WORD>(ordinal)));
+    } else {
+        target = ::GetProcAddress(module, symbol.c_str());
+    }
+    if (target == nullptr) {
+        ::FreeLibrary(module);
+        fail(PeErrorCode::ExportNotFound, "Forwarded export target was not found: " + forwarder, ::GetLastError());
+    }
+    state.dependencies.push_back({moduleName, module});
+    (void)exportDirectory;
+    return reinterpret_cast<void*>(target);
+}
+
 void* resolveFunctionRva(ModuleState& state, std::uint32_t functionRva, IMAGE_DATA_DIRECTORY exportDirectory) {
     if (functionRva == 0) {
         fail(PeErrorCode::ExportNotFound, "The export is a null RVA");
+    }
+    const std::uint64_t exportEnd =
+        static_cast<std::uint64_t>(exportDirectory.VirtualAddress) + exportDirectory.Size;
+    if (functionRva >= exportDirectory.VirtualAddress && functionRva < exportEnd) {
+        return resolveForwarder(state, functionRva, exportDirectory);
     }
     (void)mappedSpan(state, functionRva, 1, PeErrorCode::InvalidExportDirectory, "Export target");
     return state.base + functionRva;

@@ -98,7 +98,7 @@ ParsedImage parseImage(std::span<const std::byte> image) {
 
     const auto dos = readObject<IMAGE_DOS_HEADER>(image, 0, PeErrorCode::InvalidDosHeader, "DOS header");
     if (dos.e_magic != IMAGE_DOS_SIGNATURE) {
-        fail(PeErrorCode::InvalidDosHeader, "Invalid DOS signature (expeced MZ)");
+        fail(PeErrorCode::InvalidDosHeader, "Invalid DOS signature (expected MZ)");
     }
     if (dos.e_lfanew < 0) {
         fail(PeErrorCode::InvalidNtHeader, "DOS e_lfanew is negative");
@@ -120,7 +120,7 @@ ParsedImage parseImage(std::span<const std::byte> image) {
         fail(PeErrorCode::UnsupportedImageType, "Only DLL images are supported");
     }
     if (fileHeader.NumberOfSections == 0 || fileHeader.NumberOfSections > kMaximumSections) {
-        fail(PeErrorCode::InvalidSection, "The section count is zero or exceedes the safety limit");
+        fail(PeErrorCode::InvalidSection, "The section count is zero or exceeds the safety limit");
     }
 
     const std::size_t optionalOffset = fileHeaderOffset + sizeof(IMAGE_FILE_HEADER);

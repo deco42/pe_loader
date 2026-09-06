@@ -79,7 +79,7 @@ void resolveImports(ModuleState& state) {
             break;
         }
         if (descriptor.Name == 0 || descriptor.FirstThunk == 0) {
-            fail(PeErrorCode::InvalidImportDirectory, "Import descriptor is mising a name or IAT");
+            fail(PeErrorCode::InvalidImportDirectory, "Import descriptor is missing a name or IAT");
         }
         const std::string moduleName = mappedString(
             state, descriptor.Name, PeErrorCode::InvalidImportDirectory, "Imported module name");

@@ -82,6 +82,19 @@ void* resolveExport(ModuleState& state, const char* name) {
     }
     const auto* exports = mappedObject<IMAGE_EXPORT_DIRECTORY>(
         state, exportDirectory.VirtualAddress, PeErrorCode::InvalidExportDirectory, "Export directory");
+    if (exports->NumberOfNames > exports->NumberOfFunctions) {
+        fail(PeErrorCode::InvalidExportDirectory, "Export name count exceeds function count");
+    }
+    (void)mappedSpan(state, exports->AddressOfFunctions,
+        static_cast<std::size_t>(exports->NumberOfFunctions) * sizeof(DWORD),
+        PeErrorCode::InvalidExportDirectory, "Export address table");
+    (void)mappedSpan(state, exports->AddressOfNames,
+        static_cast<std::size_t>(exports->NumberOfNames) * sizeof(DWORD),
+        PeErrorCode::InvalidExportDirectory, "Export name table");
+    (void)mappedSpan(state, exports->AddressOfNameOrdinals,
+        static_cast<std::size_t>(exports->NumberOfNames) * sizeof(WORD),
+        PeErrorCode::InvalidExportDirectory, "Export ordinal table");
+
     for (std::size_t i = 0; i < exports->NumberOfNames; ++i) {
         const DWORD nameRva = readMapped<DWORD>(state,
             addRva(exports->AddressOfNames, i * sizeof(DWORD), PeErrorCode::InvalidExportDirectory),

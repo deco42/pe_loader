@@ -23,6 +23,7 @@ target_include_directories(pe_loader
 target_compile_features(pe_loader PUBLIC cxx_std_20)
 target_compile_definitions(pe_loader
     PUBLIC NOMINMAX WIN32_LEAN_AND_MEAN
+    PRIVATE $<$<BOOL:${PELOADER_ENABLE_VERBOSE_LOGGING}>:PELOADER_VERBOSE_LOGGING=1>
 )
 target_compile_options(pe_loader PRIVATE /W4 /permissive- /EHsc /utf-8)
 target_link_libraries(pe_loader PUBLIC ntdll)

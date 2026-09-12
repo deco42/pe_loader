@@ -44,6 +44,12 @@ void* LoadedModule::getExportAddress(std::uint16_t ordinal) const {
     return detail::resolveExport(impl_->state, ordinal);
 }
 
+std::span<const std::byte> LoadedModule::getResource(
+    std::uint16_t type, std::uint16_t name, std::uint16_t language) const {
+    if (!impl_) detail::fail(PeErrorCode::InvalidArgument, "Cannot query an unloaded module");
+    return detail::findResource(impl_->state, type, name, language);
+}
+
 void LoadedModule::unload() noexcept { impl_.reset(); }
 
 } // namespace pe

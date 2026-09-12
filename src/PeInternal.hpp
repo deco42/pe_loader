@@ -75,6 +75,8 @@ void resolveImports(ModuleState& state);
 void applyFinalProtections(ModuleState& state);
 [[nodiscard]] void* resolveExport(ModuleState& state, const char* name);
 [[nodiscard]] void* resolveExport(ModuleState& state, std::uint16_t ordinal);
+[[nodiscard]] std::span<const std::byte> findResource(
+    const ModuleState& state, std::uint16_t type, std::uint16_t name, std::uint16_t language);
 void unload(ModuleState& state) noexcept;
 
 void log(std::string_view message) noexcept;

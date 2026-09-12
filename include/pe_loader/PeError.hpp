@@ -26,6 +26,7 @@ enum class PeErrorCode {
     MemoryProtectionFailed,
     InvalidExportDirectory,
     ExportNotFound,
+    InvalidResourceDirectory,
     EntryPointFailed,
     WindowsApiFailure
 };

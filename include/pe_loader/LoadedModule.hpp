@@ -39,6 +39,11 @@ public:
         return reinterpret_cast<T>(getExportAddress(ordinal));
     }
 
+    [[nodiscard]] std::span<const std::byte> getResource(
+        std::uint16_t type,
+        std::uint16_t name,
+        std::uint16_t language = 0) const;
+
     void unload() noexcept;
 
 private:

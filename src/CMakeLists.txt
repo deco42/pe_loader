@@ -8,6 +8,7 @@ target_sources(pe_loader
         Relocations.cpp
         Imports.cpp
         Exports.cpp
+        Resources.cpp
         MemoryProtection.cpp
         Loader.cpp
         Unloader.cpp

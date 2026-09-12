@@ -211,6 +211,7 @@ ImageInfo toImageInfo(const ParsedImage& image) {
     info.entryPointRva = optional.AddressOfEntryPoint;
     info.hasRelocations = hasDirectory(image, IMAGE_DIRECTORY_ENTRY_BASERELOC);
     info.hasImports = hasDirectory(image, IMAGE_DIRECTORY_ENTRY_IMPORT);
+    info.hasResources = hasDirectory(image, IMAGE_DIRECTORY_ENTRY_RESOURCE);
     for (const auto& section : image.sections) {
         const auto* nameBegin = reinterpret_cast<const char*>(section.Name);
         const auto* nameEnd = std::find(nameBegin, nameBegin + IMAGE_SIZEOF_SHORT_NAME, '\0');

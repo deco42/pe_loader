@@ -118,6 +118,20 @@ int forwarded(const std::filesystem::path& path) {
     return 0;
 }
 
+int resource(const std::filesystem::path& path) {
+    NativeModule native(path);
+    constexpr std::uint16_t rawDataResourceType = 10;
+    HRSRC nativeResource = ::FindResourceW(
+        native.handle, MAKEINTRESOURCEW(101), MAKEINTRESOURCEW(rawDataResourceType));
+    require(nativeResource != nullptr && ::SizeofResource(native.handle, nativeResource) != 0,
+        "Native resource lookup failed");
+    auto module = pe::PeLoader::load(readFile(path));
+    const auto payload = module.getResource(rawDataResourceType, 101);
+    const std::string text(reinterpret_cast<const char*>(payload.data()), payload.size());
+    require(text.starts_with("memory-resource-payload"), "Loader-side resource contents are wrong");
+    return 0;
+}
+
 int repeated(const std::filesystem::path& path) {
     const auto bytes = readFile(path);
     for (int i = 0; i < 100; ++i) {
@@ -228,6 +242,7 @@ int wmain(int argc, wchar_t** argv) {
         if (mode == "import") return namedImport(path);
         if (mode == "ordinal") return ordinalImport(path);
         if (mode == "forwarded") return forwarded(path);
+        if (mode == "resource") return resource(path);
         if (mode == "repeat") return repeated(path);
         if (mode == "invalid") return invalid(path);
         if (mode == "parallel") return parallel(path);

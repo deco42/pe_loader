@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(PeLoader VERSION 0.1.0 LANGUAGES CXX)
+project(PeLoader VERSION 0.1.0 LANGUAGES CXX RC)
 
 if(NOT WIN32)
     message(FATAL_ERROR "PeLoader supports Windows 10/11 only.")

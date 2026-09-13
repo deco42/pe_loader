@@ -23,6 +23,7 @@ enum class PeErrorCode {
     ImportModuleNotFound,
     ImportSymbolNotFound,
     InvalidImportDirectory,
+    InvalidDelayImportDirectory,
     MemoryProtectionFailed,
     InvalidExportDirectory,
     ExportNotFound,

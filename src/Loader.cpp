@@ -13,6 +13,7 @@ LoadedModule PeLoader::load(std::span<const std::byte> image) {
     detail::allocateAndMap(parsed, state);
     detail::applyRelocations(state);
     detail::resolveImports(state);
+    detail::resolveDelayImports(state);
     detail::applyFinalProtections(state);
 
     if (state.entryPointRva != 0) {

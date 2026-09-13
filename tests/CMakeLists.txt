@@ -25,6 +25,9 @@ pe_test_dll(ForwarderDll
     modules/ForwarderDll/ForwarderDll.cpp
     modules/ForwarderDll/ForwarderDll.def)
 
+pe_test_dll(DelayImportDll modules/DelayImportDll/DelayImportDll.cpp)
+target_link_libraries(DelayImportDll PRIVATE DependencyDll delayimp)
+target_link_options(DelayImportDll PRIVATE "/DELAYLOAD:DependencyDll.dll")
 pe_test_dll(ResourceDll
     modules/ResourceDll/ResourceDll.cpp
     modules/ResourceDll/ResourceDll.rc)
@@ -55,6 +58,7 @@ pe_add_module_test(PeLoader.Relocation relocation RelocationDll)
 pe_add_module_test(PeLoader.ImportByName import ImportDll)
 pe_add_module_test(PeLoader.ImportByOrdinal ordinal OrdinalImportDll)
 pe_add_module_test(PeLoader.ForwardedExport forwarded ForwarderDll)
+pe_add_module_test(PeLoader.DelayImport delay DelayImportDll)
 pe_add_module_test(PeLoader.Resources resource ResourceDll)
 pe_add_module_test(PeLoader.RepeatedLoadUnload repeat BasicDll)
 pe_add_module_test(PeLoader.InvalidPe invalid BasicDll)

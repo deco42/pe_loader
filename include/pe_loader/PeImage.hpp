@@ -22,6 +22,7 @@ struct ImageInfo {
     std::uint32_t entryPointRva{};
     bool hasRelocations{};
     bool hasImports{};
+    bool hasDelayImports{};
     bool hasResources{};
     std::vector<SectionInfo> sections;
 };

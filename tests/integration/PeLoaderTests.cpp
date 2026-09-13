@@ -118,6 +118,14 @@ int forwarded(const std::filesystem::path& path) {
     return 0;
 }
 
+int delayImport(const std::filesystem::path& path) {
+    NativeModule native(path);
+    require(native.get<int (*)()>("UseDelayImport")() == 0x5a17, "Native delay import failed");
+    auto module = pe::PeLoader::load(readFile(path));
+    require(module.getExport<int (*)()>("UseDelayImport")() == 0x5a17, "Manual delay import failed");
+    return 0;
+}
+
 int resource(const std::filesystem::path& path) {
     NativeModule native(path);
     constexpr std::uint16_t rawDataResourceType = 10;
@@ -242,6 +250,7 @@ int wmain(int argc, wchar_t** argv) {
         if (mode == "import") return namedImport(path);
         if (mode == "ordinal") return ordinalImport(path);
         if (mode == "forwarded") return forwarded(path);
+        if (mode == "delay") return delayImport(path);
         if (mode == "resource") return resource(path);
         if (mode == "repeat") return repeated(path);
         if (mode == "invalid") return invalid(path);

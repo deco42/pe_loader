@@ -7,6 +7,7 @@ target_sources(pe_loader
         ImageMapper.cpp
         Relocations.cpp
         Imports.cpp
+        DelayImports.cpp
         Exports.cpp
         Resources.cpp
         MemoryProtection.cpp

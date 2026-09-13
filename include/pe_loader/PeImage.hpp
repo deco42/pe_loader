@@ -23,6 +23,7 @@ struct ImageInfo {
     bool hasRelocations{};
     bool hasImports{};
     bool hasDelayImports{};
+    bool hasLoadConfig{};
     bool hasResources{};
     std::vector<SectionInfo> sections;
 };

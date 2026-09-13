@@ -140,6 +140,20 @@ int resource(const std::filesystem::path& path) {
     return 0;
 }
 
+int cfg(const std::filesystem::path& path) {
+    NativeModule native(path);
+    require(native.get<int (*)()>("RunCfgIndirectCall")() == 42, "Native CFG indirect call failed");
+    try {
+        auto module = pe::PeLoader::load(readFile(path));
+        (void)module;
+    } catch (const pe::PeError& error) {
+        require(error.code() == pe::PeErrorCode::UnsupportedFeature,
+            "CFG fixture failed with the wrong structured error");
+        return 0;
+    }
+    throw std::runtime_error("CFG-instrumented DLL was silently accepted without loader registration");
+}
+
 int repeated(const std::filesystem::path& path) {
     const auto bytes = readFile(path);
     for (int i = 0; i < 100; ++i) {
@@ -252,6 +266,7 @@ int wmain(int argc, wchar_t** argv) {
         if (mode == "forwarded") return forwarded(path);
         if (mode == "delay") return delayImport(path);
         if (mode == "resource") return resource(path);
+        if (mode == "cfg") return cfg(path);
         if (mode == "repeat") return repeated(path);
         if (mode == "invalid") return invalid(path);
         if (mode == "parallel") return parallel(path);

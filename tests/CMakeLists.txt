@@ -31,6 +31,9 @@ target_link_options(DelayImportDll PRIVATE "/DELAYLOAD:DependencyDll.dll")
 pe_test_dll(ResourceDll
     modules/ResourceDll/ResourceDll.cpp
     modules/ResourceDll/ResourceDll.rc)
+pe_test_dll(CfgDll modules/CfgDll/CfgDll.cpp)
+target_compile_options(CfgDll PRIVATE /guard:cf)
+target_link_options(CfgDll PRIVATE /guard:cf)
 
 add_executable(pe_loader_tests integration/PeLoaderTests.cpp)
 target_link_libraries(pe_loader_tests PRIVATE PeLoader::PeLoader)
@@ -60,6 +63,7 @@ pe_add_module_test(PeLoader.ImportByOrdinal ordinal OrdinalImportDll)
 pe_add_module_test(PeLoader.ForwardedExport forwarded ForwarderDll)
 pe_add_module_test(PeLoader.DelayImport delay DelayImportDll)
 pe_add_module_test(PeLoader.Resources resource ResourceDll)
+pe_add_module_test(PeLoader.Cfg cfg CfgDll)
 pe_add_module_test(PeLoader.RepeatedLoadUnload repeat BasicDll)
 pe_add_module_test(PeLoader.InvalidPe invalid BasicDll)
 pe_add_module_test(PeLoader.ParallelLoad parallel BasicDll)

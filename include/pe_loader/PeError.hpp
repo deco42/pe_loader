@@ -24,11 +24,13 @@ enum class PeErrorCode {
     ImportSymbolNotFound,
     InvalidImportDirectory,
     InvalidDelayImportDirectory,
+    InvalidLoadConfig,
     MemoryProtectionFailed,
     InvalidExportDirectory,
     ExportNotFound,
     InvalidResourceDirectory,
     EntryPointFailed,
+    UnsupportedFeature,
     WindowsApiFailure
 };
 

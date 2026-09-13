@@ -73,6 +73,7 @@ void allocateAndMap(const ParsedImage& image, ModuleState& state);
 void applyRelocations(ModuleState& state);
 void resolveImports(ModuleState& state);
 void resolveDelayImports(ModuleState& state);
+void validateLoadConfig(ModuleState& state);
 void applyFinalProtections(ModuleState& state);
 [[nodiscard]] void* resolveExport(ModuleState& state, const char* name);
 [[nodiscard]] void* resolveExport(ModuleState& state, std::uint16_t ordinal);

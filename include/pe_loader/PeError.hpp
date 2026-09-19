@@ -24,6 +24,7 @@ enum class PeErrorCode {
     ImportSymbolNotFound,
     InvalidImportDirectory,
     InvalidDelayImportDirectory,
+    InvalidTlsDirectory,
     InvalidLoadConfig,
     MemoryProtectionFailed,
     InvalidExportDirectory,

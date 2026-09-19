@@ -13,10 +13,15 @@ void unload(ModuleState& state) noexcept {
         entry(reinterpret_cast<HINSTANCE>(state.base), DLL_PROCESS_DETACH, nullptr);
         state.dllAttached = false;
     }
+    runTlsCallbacks(state, DLL_PROCESS_DETACH);
     for (auto it = state.dependencies.rbegin(); it != state.dependencies.rend(); ++it) {
         if (it->handle != nullptr) ::FreeLibrary(it->handle);
     }
     state.dependencies.clear();
+    state.staticTls.templateBytes.clear();
+    state.staticTls.directoryPresent = false;
+    state.staticTls.compilerManaged = false;
+    state.tlsCallbacks.clear();
     ::VirtualFree(state.base, 0, MEM_RELEASE);
     state.base = nullptr;
     state.size = 0;

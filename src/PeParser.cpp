@@ -212,6 +212,7 @@ ImageInfo toImageInfo(const ParsedImage& image) {
     info.hasRelocations = hasDirectory(image, IMAGE_DIRECTORY_ENTRY_BASERELOC);
     info.hasImports = hasDirectory(image, IMAGE_DIRECTORY_ENTRY_IMPORT);
     info.hasDelayImports = hasDirectory(image, IMAGE_DIRECTORY_ENTRY_DELAY_IMPORT);
+    info.hasTls = hasDirectory(image, IMAGE_DIRECTORY_ENTRY_TLS);
     info.hasLoadConfig = hasDirectory(image, IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG);
     info.hasResources = hasDirectory(image, IMAGE_DIRECTORY_ENTRY_RESOURCE);
     for (const auto& section : image.sections) {

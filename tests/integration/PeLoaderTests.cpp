@@ -118,6 +118,20 @@ int forwarded(const std::filesystem::path& path) {
     return 0;
 }
 
+int tls(const std::filesystem::path& path) {
+    // Windows does not invoke callbacks for this deliberately zero-length TLS
+    // template. The manual loader supports the metadata-only callback case and
+    // this fixture ensures it is not mistaken for compiler-managed storage.
+    {
+        NativeModule native(path);
+        require(native.get<LONG (*)()>("TlsCallbackState")() == 0,
+            "Native zero-length TLS behavior changed; revisit the callback-only fixture");
+    }
+    auto module = pe::PeLoader::load(readFile(path));
+    require(module.getExport<LONG (*)()>("TlsCallbackState")() == 3, "Manual TLS callback ordering failed");
+    return 0;
+}
+
 int delayImport(const std::filesystem::path& path) {
     NativeModule native(path);
     require(native.get<int (*)()>("UseDelayImport")() == 0x5a17, "Native delay import failed");
@@ -264,6 +278,7 @@ int wmain(int argc, wchar_t** argv) {
         if (mode == "import") return namedImport(path);
         if (mode == "ordinal") return ordinalImport(path);
         if (mode == "forwarded") return forwarded(path);
+        if (mode == "tls") return tls(path);
         if (mode == "delay") return delayImport(path);
         if (mode == "resource") return resource(path);
         if (mode == "cfg") return cfg(path);

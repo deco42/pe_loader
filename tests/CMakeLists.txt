@@ -24,6 +24,11 @@ target_link_libraries(OrdinalImportDll PRIVATE OrdinalDependencyDll)
 pe_test_dll(ForwarderDll
     modules/ForwarderDll/ForwarderDll.cpp
     modules/ForwarderDll/ForwarderDll.def)
+pe_test_dll(TlsCallbackDll modules/TlsCallbackDll/TlsCallbackDll.cpp)
+# This fixture deliberately has no CRT-provided TLS template. Its custom
+# IMAGE_TLS_DIRECTORY64 exercises callbacks with Start == End == 0.
+target_compile_options(TlsCallbackDll PRIVATE /GS-)
+target_link_options(TlsCallbackDll PRIVATE /NODEFAULTLIB /ENTRY:DllMain)
 
 pe_test_dll(DelayImportDll modules/DelayImportDll/DelayImportDll.cpp)
 target_link_libraries(DelayImportDll PRIVATE DependencyDll delayimp)
@@ -61,6 +66,7 @@ pe_add_module_test(PeLoader.Relocation relocation RelocationDll)
 pe_add_module_test(PeLoader.ImportByName import ImportDll)
 pe_add_module_test(PeLoader.ImportByOrdinal ordinal OrdinalImportDll)
 pe_add_module_test(PeLoader.ForwardedExport forwarded ForwarderDll)
+pe_add_module_test(PeLoader.TlsCallback tls TlsCallbackDll)
 pe_add_module_test(PeLoader.DelayImport delay DelayImportDll)
 pe_add_module_test(PeLoader.Resources resource ResourceDll)
 pe_add_module_test(PeLoader.Cfg cfg CfgDll)

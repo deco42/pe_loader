@@ -27,6 +27,18 @@ struct Dependency {
     HMODULE handle{};
 };
 
+struct StaticTlsState {
+    bool directoryPresent{};
+    bool compilerManaged{};
+    std::uint32_t directoryRva{};
+    std::uint32_t indexRva{};
+    std::size_t rawTemplateSize{};
+    std::size_t zeroFillSize{};
+    std::size_t totalBlockSize{};
+    std::size_t alignment{1};
+    std::vector<std::byte> templateBytes;
+};
+
 struct ModuleState {
     std::byte* base{};
     std::size_t size{};
@@ -34,6 +46,9 @@ struct ModuleState {
     std::uint32_t entryPointRva{};
     std::vector<IMAGE_SECTION_HEADER> sections;
     std::vector<Dependency> dependencies;
+    StaticTlsState staticTls;
+    std::vector<PIMAGE_TLS_CALLBACK> tlsCallbacks;
+    bool callbacksAttached{};
     bool dllAttached{};
 };
 
@@ -73,6 +88,8 @@ void allocateAndMap(const ParsedImage& image, ModuleState& state);
 void applyRelocations(ModuleState& state);
 void resolveImports(ModuleState& state);
 void resolveDelayImports(ModuleState& state);
+void collectTlsCallbacks(ModuleState& state);
+void runTlsCallbacks(ModuleState& state, DWORD reason) noexcept;
 void validateLoadConfig(ModuleState& state);
 void applyFinalProtections(ModuleState& state);
 [[nodiscard]] void* resolveExport(ModuleState& state, const char* name);

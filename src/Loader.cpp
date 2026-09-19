@@ -15,7 +15,9 @@ LoadedModule PeLoader::load(std::span<const std::byte> image) {
     detail::resolveImports(state);
     detail::resolveDelayImports(state);
     detail::validateLoadConfig(state);
+    detail::collectTlsCallbacks(state);
     detail::applyFinalProtections(state);
+    detail::runTlsCallbacks(state, DLL_PROCESS_ATTACH);
 
     if (state.entryPointRva != 0) {
         using DllMain = BOOL(WINAPI*)(HINSTANCE, DWORD, LPVOID);

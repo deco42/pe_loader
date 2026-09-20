@@ -132,6 +132,21 @@ int tls(const std::filesystem::path& path) {
     return 0;
 }
 
+int staticTls(const std::filesystem::path& path) {
+    NativeModule native(path);
+    require(native.get<int (*)()>("StaticTlsValue")() == 10, "Native static TLS value failed");
+    require(native.get<int (*)()>("StaticTlsThreadIsolation")() == 1, "Native static TLS isolation failed");
+    try {
+        auto module = pe::PeLoader::load(readFile(path));
+        (void)module;
+    } catch (const pe::PeError& error) {
+        require(error.code() == pe::PeErrorCode::StaticTlsUnsupported,
+            "Static TLS failed with the wrong structured error");
+        return 0;
+    }
+    throw std::runtime_error("Static TLS was silently accepted despite lacking documented registration support");
+}
+
 int delayImport(const std::filesystem::path& path) {
     NativeModule native(path);
     require(native.get<int (*)()>("UseDelayImport")() == 0x5a17, "Native delay import failed");
@@ -279,6 +294,7 @@ int wmain(int argc, wchar_t** argv) {
         if (mode == "ordinal") return ordinalImport(path);
         if (mode == "forwarded") return forwarded(path);
         if (mode == "tls") return tls(path);
+        if (mode == "static_tls") return staticTls(path);
         if (mode == "delay") return delayImport(path);
         if (mode == "resource") return resource(path);
         if (mode == "cfg") return cfg(path);

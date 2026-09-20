@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstring>
 #include <limits>
+#include <sstream>
 
 namespace pe::detail {
 namespace {
@@ -112,6 +113,18 @@ void collectTlsCallbacks(ModuleState& state) {
         }
     }
 
+    std::ostringstream diagnostics;
+    diagnostics << "[TLS] directory present raw template size=" << staticTls.rawTemplateSize
+                << " zero fill=" << staticTls.zeroFillSize
+                << " alignment=" << staticTls.alignment
+                << " index storage RVA=0x" << std::hex << staticTls.indexRva
+                << " callbacks=" << std::dec << state.tlsCallbacks.size();
+    log(diagnostics.str());
+
+    if (staticTls.compilerManaged) {
+        fail(PeErrorCode::StaticTlsUnsupported,
+            "The DLL contains static TLS. TlsAlloc/TlsSetValue do not populate the loader-managed static TLS vector used by MSVC-generated code");
+    }
 }
 
 void runTlsCallbacks(ModuleState& state, DWORD reason) noexcept {

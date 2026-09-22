@@ -19,8 +19,27 @@ std::uint32_t vaToRva(
     return static_cast<std::uint32_t>(address - base);
 }
 
+[[nodiscard]] bool isWritableImageRange(
+    const ModuleState& state, std::uint32_t rva, std::size_t length) noexcept {
+    for (const auto& section : state.sections) {
+        const auto sectionLength = (std::max)(
+            static_cast<std::size_t>(section.Misc.VirtualSize),
+            static_cast<std::size_t>(section.SizeOfRawData));
+        if (rva < section.VirtualAddress) continue;
+        const auto offset = static_cast<std::size_t>(rva - section.VirtualAddress);
+        if (offset <= sectionLength && length <= sectionLength - offset) {
+            return (section.Characteristics & IMAGE_SCN_MEM_WRITE) != 0;
+        }
+    }
+    return false;
+}
+
 [[nodiscard]] std::size_t tlsAlignment(DWORD characteristics) {
-    const DWORD encoding = (characteristics & 0x00F00000) >> 20;
+    constexpr DWORD alignmentMask = 0x00F00000;
+    if ((characteristics & ~alignmentMask) != 0) {
+        fail(PeErrorCode::InvalidTlsDirectory, "TLS Characteristics contains reserved bits");
+    }
+    const DWORD encoding = (characteristics & alignmentMask) >> 20;
     if (encoding == 0) return 1;
     if (encoding >= 14) {
         fail(PeErrorCode::InvalidTlsDirectory, "TLS Characteristics has an invalid alignment encoding");
@@ -87,6 +106,12 @@ void collectTlsCallbacks(ModuleState& state) {
 
     if (tls->AddressOfIndex != 0) {
         staticTls.indexRva = vaToRva(state, tls->AddressOfIndex, sizeof(DWORD), "TLS index slot");
+        if (staticTls.indexRva % alignof(DWORD) != 0) {
+            fail(PeErrorCode::InvalidTlsDirectory, "TLS index slot is not DWORD-aligned");
+        }
+        if (!isWritableImageRange(state, staticTls.indexRva, sizeof(DWORD))) {
+            fail(PeErrorCode::InvalidTlsDirectory, "TLS index slot is not in a writable image section");
+        }
     } else if (staticTls.compilerManaged) {
         fail(PeErrorCode::InvalidTlsDirectory, "Compiler-managed TLS has no AddressOfIndex");
     }

@@ -14,6 +14,7 @@ void unload(ModuleState& state) noexcept {
         state.dllAttached = false;
     }
     runTlsCallbacks(state, DLL_PROCESS_DETACH);
+    unregisterExceptions(state);
     for (auto it = state.dependencies.rbegin(); it != state.dependencies.rend(); ++it) {
         if (it->handle != nullptr) ::FreeLibrary(it->handle);
     }

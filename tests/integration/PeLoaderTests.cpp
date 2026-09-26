@@ -147,6 +147,41 @@ int staticTls(const std::filesystem::path& path) {
     throw std::runtime_error("Static TLS was silently accepted despite lacking documented registration support");
 }
 
+int exceptionTest(const std::filesystem::path& path) {
+    NativeModule native(path);
+    require(native.get<int (*)()>("RunExceptionTest")() == 1, "Native exception test failed");
+    const auto bytes = readFile(path);
+    const auto info = pe::PeLoader::inspect(bytes);
+    void* blocker = ::VirtualAlloc(
+        reinterpret_cast<void*>(static_cast<std::uintptr_t>(info.preferredImageBase)),
+        info.imageSize, MEM_RESERVE, PAGE_NOACCESS);
+    auto module = pe::PeLoader::load(bytes);
+    require(reinterpret_cast<std::uintptr_t>(module.baseAddress()) != info.preferredImageBase,
+        "Exception fixture was not relocated away from its preferred base");
+    if (blocker != nullptr) ::VirtualFree(blocker, 0, MEM_RELEASE);
+    const auto run = module.getExport<int (*)()>("RunExceptionTest");
+    DWORD64 unwindBase{};
+    const auto runtimeFunction = ::RtlLookupFunctionEntry(
+        reinterpret_cast<DWORD64>(run), &unwindBase, nullptr);
+    // The exported address can be a leaf ILT jump thunk and legitimately have no entry.
+    (void)runtimeFunction;
+    const auto* dos = static_cast<const IMAGE_DOS_HEADER*>(module.baseAddress());
+    const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS64*>(
+        static_cast<const std::byte*>(module.baseAddress()) + dos->e_lfanew);
+    const auto exceptionDirectory = nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXCEPTION];
+    const auto* table = reinterpret_cast<const RUNTIME_FUNCTION*>(
+        static_cast<const std::byte*>(module.baseAddress()) + exceptionDirectory.VirtualAddress);
+    DWORD64 tableBase{};
+    const auto tableLookup = ::RtlLookupFunctionEntry(
+        reinterpret_cast<DWORD64>(module.baseAddress()) + table[0].BeginAddress,
+        &tableBase, nullptr);
+    require(tableLookup != nullptr, "RtlLookupFunctionEntry did not find a registered runtime function");
+    require(run() == 1,
+        "Manual x64 exception/unwind test failed");
+    module.unload();
+    return 0;
+}
+
 int delayImport(const std::filesystem::path& path) {
     NativeModule native(path);
     require(native.get<int (*)()>("UseDelayImport")() == 0x5a17, "Native delay import failed");
@@ -295,6 +330,7 @@ int wmain(int argc, wchar_t** argv) {
         if (mode == "forwarded") return forwarded(path);
         if (mode == "tls") return tls(path);
         if (mode == "static_tls") return staticTls(path);
+        if (mode == "exception") return exceptionTest(path);
         if (mode == "delay") return delayImport(path);
         if (mode == "resource") return resource(path);
         if (mode == "cfg") return cfg(path);

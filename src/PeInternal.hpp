@@ -4,6 +4,7 @@
 
 #include <Windows.h>
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <span>
@@ -48,6 +49,11 @@ struct ModuleState {
     std::vector<Dependency> dependencies;
     StaticTlsState staticTls;
     std::vector<PIMAGE_TLS_CALLBACK> tlsCallbacks;
+    RUNTIME_FUNCTION* exceptionTable{};
+    DWORD exceptionCount{};
+    void* growableFunctionTable{};
+    bool exceptionRegistered{};
+    bool exceptionRoutingRegistered{};
     bool callbacksAttached{};
     bool dllAttached{};
 };
@@ -90,6 +96,8 @@ void resolveImports(ModuleState& state);
 void resolveDelayImports(ModuleState& state);
 void collectTlsCallbacks(ModuleState& state);
 void runTlsCallbacks(ModuleState& state, DWORD reason) noexcept;
+void registerExceptions(ModuleState& state);
+void unregisterExceptions(ModuleState& state) noexcept;
 void validateLoadConfig(ModuleState& state);
 void applyFinalProtections(ModuleState& state);
 [[nodiscard]] void* resolveExport(ModuleState& state, const char* name);

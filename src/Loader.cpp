@@ -16,6 +16,7 @@ LoadedModule PeLoader::load(std::span<const std::byte> image) {
     detail::resolveDelayImports(state);
     detail::validateLoadConfig(state);
     detail::collectTlsCallbacks(state);
+    detail::registerExceptions(state);
     detail::applyFinalProtections(state);
     detail::runTlsCallbacks(state, DLL_PROCESS_ATTACH);
 

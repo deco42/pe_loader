@@ -9,6 +9,7 @@ target_sources(pe_loader
         Imports.cpp
         DelayImports.cpp
         Tls.cpp
+        Exceptions.cpp
         LoadConfig.cpp
         Exports.cpp
         Resources.cpp

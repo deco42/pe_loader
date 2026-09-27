@@ -289,6 +289,64 @@ int invalid(const std::filesystem::path& path) {
     auto& badImport = ntHeaders(mutation)->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
     badImport.Size = 1;
     mustRejectLoad(mutation, "short import directory");
+    mutation = valid;
+    auto& badException = ntHeaders(mutation)->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXCEPTION];
+    badException.Size = 1;
+    mustRejectLoad(mutation, "mis-sized exception directory");
+    mutation = valid;
+    auto* tlsNt = ntHeaders(mutation);
+    const auto* tlsSections = IMAGE_FIRST_SECTION(tlsNt);
+    const std::size_t tlsRva = reinterpret_cast<const std::byte*>(tlsSections + tlsNt->FileHeader.NumberOfSections) -
+        mutation.data();
+    require(tlsRva + sizeof(IMAGE_TLS_DIRECTORY64) <= tlsNt->OptionalHeader.SizeOfHeaders,
+        "Fixture has no header slack for malformed TLS directory");
+    IMAGE_TLS_DIRECTORY64 invalidTls{};
+    invalidTls.StartAddressOfRawData = tlsNt->OptionalHeader.ImageBase + 0x2000;
+    invalidTls.EndAddressOfRawData = invalidTls.StartAddressOfRawData - 1;
+    std::memcpy(mutation.data() + tlsRva, &invalidTls, sizeof(invalidTls));
+    tlsNt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_TLS] = {
+        static_cast<DWORD>(tlsRva), sizeof(IMAGE_TLS_DIRECTORY64)};
+    mustRejectLoad(mutation, "reversed TLS template");
+    mutation = valid;
+    tlsNt = ntHeaders(mutation);
+    invalidTls = {};
+    invalidTls.StartAddressOfRawData = tlsNt->OptionalHeader.ImageBase + 0x2000;
+    invalidTls.EndAddressOfRawData = invalidTls.StartAddressOfRawData + sizeof(std::uint64_t);
+    std::memcpy(mutation.data() + tlsRva, &invalidTls, sizeof(invalidTls));
+    tlsNt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_TLS] = {
+        static_cast<DWORD>(tlsRva), sizeof(IMAGE_TLS_DIRECTORY64)};
+    mustRejectLoad(mutation, "static TLS without AddressOfIndex");
+    mutation = valid;
+    tlsNt = ntHeaders(mutation);
+    invalidTls.AddressOfIndex = tlsNt->OptionalHeader.ImageBase + tlsRva;
+    std::memcpy(mutation.data() + tlsRva, &invalidTls, sizeof(invalidTls));
+    tlsNt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_TLS] = {
+        static_cast<DWORD>(tlsRva), sizeof(IMAGE_TLS_DIRECTORY64)};
+    mustRejectLoad(mutation, "TLS index in non-writable headers");
+    mutation = valid;
+    tlsNt = ntHeaders(mutation);
+    invalidTls = {};
+    invalidTls.Characteristics = 0x00f00000;
+    std::memcpy(mutation.data() + tlsRva, &invalidTls, sizeof(invalidTls));
+    tlsNt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_TLS] = {
+        static_cast<DWORD>(tlsRva), sizeof(IMAGE_TLS_DIRECTORY64)};
+    mustRejectLoad(mutation, "invalid TLS alignment encoding");
+    mutation = valid;
+    tlsNt = ntHeaders(mutation);
+    invalidTls.Characteristics = 1;
+    std::memcpy(mutation.data() + tlsRva, &invalidTls, sizeof(invalidTls));
+    tlsNt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_TLS] = {
+        static_cast<DWORD>(tlsRva), sizeof(IMAGE_TLS_DIRECTORY64)};
+    mustRejectLoad(mutation, "reserved TLS Characteristics bits");
+    mutation = valid;
+    tlsNt = ntHeaders(mutation);
+    invalidTls = {};
+    invalidTls.StartAddressOfRawData = tlsNt->OptionalHeader.ImageBase + tlsNt->OptionalHeader.SizeOfImage + 1;
+    invalidTls.EndAddressOfRawData = invalidTls.StartAddressOfRawData;
+    std::memcpy(mutation.data() + tlsRva, &invalidTls, sizeof(invalidTls));
+    tlsNt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_TLS] = {
+        static_cast<DWORD>(tlsRva), sizeof(IMAGE_TLS_DIRECTORY64)};
+    mustRejectLoad(mutation, "out-of-image empty TLS template marker");
 
     std::mt19937 generator(0x5045);
     for (int sample = 0; sample < 64; ++sample) {

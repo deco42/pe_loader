@@ -41,7 +41,7 @@ std::uint32_t vaToRva(
     }
     const DWORD encoding = (characteristics & alignmentMask) >> 20;
     if (encoding == 0) return 1;
-    if (encoding >= 14) {
+    if (encoding > 14) {
         fail(PeErrorCode::InvalidTlsDirectory, "TLS Characteristics has an invalid alignment encoding");
     }
     return std::size_t{1} << (encoding - 1);

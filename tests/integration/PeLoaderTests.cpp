@@ -4,6 +4,7 @@
 #include <Windows.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -20,6 +21,10 @@
 #include <vector>
 
 namespace {
+
+std::atomic<int> g_destructorCalls{};
+
+extern "C" void destructionObserved() { ++g_destructorCalls; }
 
 void require(bool condition, std::string_view message) {
     if (!condition) throw std::runtime_error(std::string(message));
@@ -182,6 +187,16 @@ int exceptionTest(const std::filesystem::path& path) {
     return 0;
 }
 
+int constructors(const std::filesystem::path& path) {
+    g_destructorCalls = 0;
+    auto module = pe::PeLoader::load(readFile(path));
+    require(module.getExport<int (*)()>("ConstructorState")() == 1, "Global constructor did not run");
+    module.getExport<void (*)(void (*)())>("SetDestructionCallback")(&destructionObserved);
+    module.unload();
+    require(g_destructorCalls == 1, "Global destructor was not observed during unload");
+    return 0;
+}
+
 int delayImport(const std::filesystem::path& path) {
     NativeModule native(path);
     require(native.get<int (*)()>("UseDelayImport")() == 0x5a17, "Native delay import failed");
@@ -201,6 +216,14 @@ int resource(const std::filesystem::path& path) {
     const auto payload = module.getResource(rawDataResourceType, 101);
     const std::string text(reinterpret_cast<const char*>(payload.data()), payload.size());
     require(text.starts_with("memory-resource-payload"), "Loader-side resource contents are wrong");
+    return 0;
+}
+
+int threading(const std::filesystem::path& path) {
+    NativeModule native(path);
+    require(native.get<int (*)()>("RunThreadTest")() == 1, "Native threading test failed");
+    auto module = pe::PeLoader::load(readFile(path));
+    require(module.getExport<int (*)()>("RunThreadTest")() == 1, "Manual threading test failed");
     return 0;
 }
 
@@ -389,8 +412,10 @@ int wmain(int argc, wchar_t** argv) {
         if (mode == "tls") return tls(path);
         if (mode == "static_tls") return staticTls(path);
         if (mode == "exception") return exceptionTest(path);
+        if (mode == "constructors") return constructors(path);
         if (mode == "delay") return delayImport(path);
         if (mode == "resource") return resource(path);
+        if (mode == "threading") return threading(path);
         if (mode == "cfg") return cfg(path);
         if (mode == "repeat") return repeated(path);
         if (mode == "invalid") return invalid(path);

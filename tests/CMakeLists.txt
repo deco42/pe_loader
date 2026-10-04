@@ -45,6 +45,15 @@ pe_test_dll(ThreadingDll modules/ThreadingDll/ThreadingDll.cpp)
 pe_test_dll(CfgDll modules/CfgDll/CfgDll.cpp)
 target_compile_options(CfgDll PRIVATE /guard:cf)
 target_link_options(CfgDll PRIVATE /guard:cf)
+pe_test_dll(ComplexCppDll
+    modules/ComplexCppDll/ComplexCppDll.cpp
+    modules/ComplexCppDll/ComplexCppDll.rc)
+target_link_libraries(ComplexCppDll PRIVATE DependencyDll bcrypt user32)
+pe_apply_runtime(ComplexCppDll DYNAMIC)
+pe_test_dll(ComplexCppDllMt
+    modules/ComplexCppDll/ComplexCppDll.cpp
+    modules/ComplexCppDll/ComplexCppDll.rc)
+target_link_libraries(ComplexCppDllMt PRIVATE DependencyDll bcrypt user32)
 
 add_executable(pe_loader_tests integration/PeLoaderTests.cpp)
 target_link_libraries(pe_loader_tests PRIVATE PeLoader::PeLoader)
@@ -81,6 +90,9 @@ pe_add_module_test(PeLoader.DelayImport delay DelayImportDll)
 pe_add_module_test(PeLoader.Resources resource ResourceDll)
 pe_add_module_test(PeLoader.Threading threading ThreadingDll)
 pe_add_module_test(PeLoader.Cfg cfg CfgDll)
+pe_add_module_test(PeLoader.ComplexCpp complex ComplexCppDll)
+pe_add_module_test(PeLoader.ComplexCppMt complex ComplexCppDllMt)
 pe_add_module_test(PeLoader.RepeatedLoadUnload repeat BasicDll)
 pe_add_module_test(PeLoader.InvalidPe invalid BasicDll)
+pe_add_module_test(PeLoader.CompareWithLoadLibrary compare ComplexCppDll)
 pe_add_module_test(PeLoader.ParallelLoad parallel BasicDll)

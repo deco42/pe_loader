@@ -1,0 +1,2 @@
+#include <windows.h>
+201 RCDATA "complex-payload.bin"

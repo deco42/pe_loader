@@ -241,6 +241,42 @@ int cfg(const std::filesystem::path& path) {
     throw std::runtime_error("CFG-instrumented DLL was silently accepted without loader registration");
 }
 
+std::uint64_t runComplexNative(const std::filesystem::path& path) {
+    NativeModule native(path);
+    ModuleContext context{1, L"native", 0xffff};
+    require(native.get<bool (*)(const ModuleContext*)>("ModuleInitialize")(&context), "Native initialize failed");
+    require(native.get<int (*)()>("ModuleRun")() == 42, "Native ModuleRun failed");
+    TestReport report{};
+    const auto result = native.get<std::uint64_t (*)(TestReport*)>("RunComprehensiveSelfTest")(&report);
+    native.get<void (*)()>("ModuleShutdown")();
+    require(report.failed == 0, "Native complex report contains failed feature flags");
+    return result;
+}
+
+std::uint64_t runComplexManual(const std::filesystem::path& path) {
+    auto module = pe::PeLoader::load(readFile(path));
+    ModuleContext context{1, L"manual", 0xffff};
+    require(module.getExport<bool (*)(const ModuleContext*)>("ModuleInitialize")(&context), "Manual initialize failed");
+    require(module.getExport<int (*)()>("ModuleRun")() == 42, "Manual ModuleRun failed");
+    TestReport report{};
+    const auto result = module.getExport<std::uint64_t (*)(TestReport*)>("RunComprehensiveSelfTest")(&report);
+    module.getExport<void (*)()>("ModuleShutdown")();
+    require(report.failed == 0, "Manual complex report contains failed feature flags");
+    return result;
+}
+
+int complex(const std::filesystem::path& path) {
+    const auto result = runComplexManual(path);
+    require(result == (1ULL << 12) - 1, "Complex DLL did not exercise every declared feature");
+    return 0;
+}
+
+int compare(const std::filesystem::path& path) {
+    require(runComplexNative(path) == runComplexManual(path),
+        "LoadLibrary and PeLoader produced different complex feature masks");
+    return 0;
+}
+
 int repeated(const std::filesystem::path& path) {
     const auto bytes = readFile(path);
     for (int i = 0; i < 100; ++i) {
@@ -417,8 +453,10 @@ int wmain(int argc, wchar_t** argv) {
         if (mode == "resource") return resource(path);
         if (mode == "threading") return threading(path);
         if (mode == "cfg") return cfg(path);
+        if (mode == "complex") return complex(path);
         if (mode == "repeat") return repeated(path);
         if (mode == "invalid") return invalid(path);
+        if (mode == "compare") return compare(path);
         if (mode == "parallel") return parallel(path);
         throw std::runtime_error("Unknown test mode: " + mode);
     } catch (const pe::PeError& error) {

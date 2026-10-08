@@ -315,6 +315,19 @@ int invalid(const std::filesystem::path& path) {
         auto* mutableDos = reinterpret_cast<IMAGE_DOS_HEADER*>(bytes.data());
         return reinterpret_cast<IMAGE_NT_HEADERS64*>(bytes.data() + mutableDos->e_lfanew);
     };
+    auto rvaToFileOffset = [&](const std::vector<std::byte>& bytes, std::uint32_t rva) -> std::size_t {
+        const auto* imageDos = reinterpret_cast<const IMAGE_DOS_HEADER*>(bytes.data());
+        const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS64*>(bytes.data() + imageDos->e_lfanew);
+        if (rva < nt->OptionalHeader.SizeOfHeaders) return rva;
+        const auto* section = IMAGE_FIRST_SECTION(nt);
+        for (WORD i = 0; i < nt->FileHeader.NumberOfSections; ++i) {
+            if (rva >= section[i].VirtualAddress &&
+                rva - section[i].VirtualAddress < section[i].SizeOfRawData) {
+                return section[i].PointerToRawData + (rva - section[i].VirtualAddress);
+            }
+        }
+        throw std::runtime_error("Fixture RVA does not have file backing");
+    };
     auto mustRejectLoad = [&](const std::vector<std::byte>& bytes, std::string_view label, bool blockPreferred = false) {
         void* blocker{};
         if (blockPreferred) {
@@ -406,6 +419,13 @@ int invalid(const std::filesystem::path& path) {
     tlsNt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_TLS] = {
         static_cast<DWORD>(tlsRva), sizeof(IMAGE_TLS_DIRECTORY64)};
     mustRejectLoad(mutation, "out-of-image empty TLS template marker");
+    mutation = valid;
+    const auto relocationRva =
+        ntHeaders(mutation)->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC].VirtualAddress;
+    auto* relocationBlock = reinterpret_cast<IMAGE_BASE_RELOCATION*>(
+        mutation.data() + rvaToFileOffset(mutation, relocationRva));
+    relocationBlock->SizeOfBlock = UINT32_MAX;
+    mustRejectLoad(mutation, "overflowing relocation block", true);
 
     std::mt19937 generator(0x5045);
     for (int sample = 0; sample < 64; ++sample) {

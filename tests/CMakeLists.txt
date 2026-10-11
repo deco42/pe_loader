@@ -30,6 +30,14 @@ pe_test_dll(TlsCallbackDll modules/TlsCallbackDll/TlsCallbackDll.cpp)
 target_compile_options(TlsCallbackDll PRIVATE /GS-)
 target_link_options(TlsCallbackDll PRIVATE /NODEFAULTLIB /ENTRY:DllMain)
 pe_test_dll(StaticTlsDll modules/StaticTlsDll/StaticTlsDll.cpp)
+pe_test_dll(BasicStaticTlsDll modules/BasicStaticTlsDll/BasicStaticTlsDll.cpp)
+pe_test_dll(BasicStaticTlsDllMd modules/BasicStaticTlsDll/BasicStaticTlsDll.cpp)
+pe_apply_runtime(BasicStaticTlsDllMd DYNAMIC)
+pe_test_dll(ZeroInitializedStaticTlsDll
+    modules/ZeroInitializedStaticTlsDll/ZeroInitializedStaticTlsDll.cpp)
+# Keep this regression fixture /MD so its raw TLS template consists only of the
+# explicitly zero-initialized variables, without static-CRT TLS sentinels.
+pe_apply_runtime(ZeroInitializedStaticTlsDll DYNAMIC)
 
 pe_test_dll(ExceptionDll modules/ExceptionDll/ExceptionDll.cpp)
 pe_apply_runtime(ExceptionDll DYNAMIC)
@@ -83,6 +91,12 @@ pe_add_module_test(PeLoader.ImportByOrdinal ordinal OrdinalImportDll)
 pe_add_module_test(PeLoader.ForwardedExport forwarded ForwarderDll)
 pe_add_module_test(PeLoader.TlsCallback tls TlsCallbackDll)
 pe_add_module_test(PeLoader.StaticTls static_tls StaticTlsDll)
+pe_add_module_test(PeLoader.Tls.BasicStaticTlsMt basic_static_tls_unsupported BasicStaticTlsDll)
+pe_add_module_test(PeLoader.Tls.BasicStaticTlsMd basic_static_tls_unsupported BasicStaticTlsDllMd)
+pe_add_module_test(PeLoader.Tls.TlsAllocAbiProbeMt tls_alloc_abi_probe BasicStaticTlsDll)
+pe_add_module_test(PeLoader.Tls.TlsAllocAbiProbeMd tls_alloc_abi_probe BasicStaticTlsDllMd)
+pe_add_module_test(PeLoader.Tls.ZeroInitializedDetection
+    zero_static_tls_detection ZeroInitializedStaticTlsDll)
 pe_add_module_test(PeLoader.Exceptions exception ExceptionDll)
 pe_add_module_test(PeLoader.ExceptionsMt exception ExceptionDllMt)
 pe_add_module_test(PeLoader.GlobalConstructors constructors StaticConstructorDll)

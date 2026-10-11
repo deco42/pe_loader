@@ -4,6 +4,7 @@
 #include <Windows.h>
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
@@ -150,6 +151,163 @@ int staticTls(const std::filesystem::path& path) {
         return 0;
     }
     throw std::runtime_error("Static TLS was silently accepted despite lacking documented registration support");
+}
+
+int zeroStaticTlsDetection(const std::filesystem::path& path) {
+    NativeModule native(path);
+    require(native.get<int (*)()>("ZeroTlsIsInitiallyZero")() == 1,
+        "Native zero-initialized TLS did not start at zero");
+
+    const auto bytes = readFile(path);
+    require(bytes.size() >= sizeof(IMAGE_DOS_HEADER), "Zero-TLS fixture has no DOS header");
+    const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(bytes.data());
+    require(dos->e_magic == IMAGE_DOS_SIGNATURE && dos->e_lfanew >= 0,
+        "Zero-TLS fixture has an invalid DOS header");
+    const auto ntOffset = static_cast<std::size_t>(dos->e_lfanew);
+    require(ntOffset <= bytes.size() && sizeof(IMAGE_NT_HEADERS64) <= bytes.size() - ntOffset,
+        "Zero-TLS fixture has an invalid NT-header offset");
+    const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS64*>(bytes.data() + ntOffset);
+
+    const auto rvaToFileOffset = [&](std::uint32_t rva, std::size_t length) -> std::size_t {
+        if (rva < nt->OptionalHeader.SizeOfHeaders) {
+            require(rva <= bytes.size() && length <= bytes.size() - rva,
+                "Zero-TLS header range is outside the fixture");
+            return rva;
+        }
+        const auto* section = IMAGE_FIRST_SECTION(nt);
+        for (WORD index = 0; index < nt->FileHeader.NumberOfSections; ++index) {
+            if (rva >= section[index].VirtualAddress) {
+                const auto delta = static_cast<std::size_t>(rva - section[index].VirtualAddress);
+                if (delta <= section[index].SizeOfRawData &&
+                    length <= section[index].SizeOfRawData - delta) {
+                    const auto offset = static_cast<std::size_t>(section[index].PointerToRawData) + delta;
+                    require(offset <= bytes.size() && length <= bytes.size() - offset,
+                        "Zero-TLS section range is outside the fixture");
+                    return offset;
+                }
+            }
+        }
+        throw std::runtime_error("Zero-TLS RVA has no file backing");
+    };
+
+    const auto directory = nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_TLS];
+    require(directory.VirtualAddress != 0 && directory.Size >= sizeof(IMAGE_TLS_DIRECTORY64),
+        "Zero-TLS fixture has no IMAGE_TLS_DIRECTORY64");
+    const auto directoryOffset = rvaToFileOffset(directory.VirtualAddress, sizeof(IMAGE_TLS_DIRECTORY64));
+    IMAGE_TLS_DIRECTORY64 tls{};
+    std::memcpy(&tls, bytes.data() + directoryOffset, sizeof(tls));
+    require(tls.EndAddressOfRawData > tls.StartAddressOfRawData,
+        "Zero-TLS fixture has no raw static-TLS template");
+    require(tls.SizeOfZeroFill == 0,
+        "Zero-TLS regression fixture unexpectedly uses SizeOfZeroFill");
+    require(tls.StartAddressOfRawData >= nt->OptionalHeader.ImageBase &&
+            tls.EndAddressOfRawData >= nt->OptionalHeader.ImageBase,
+        "Zero-TLS template VA precedes the image base");
+    const auto rawLength64 = tls.EndAddressOfRawData - tls.StartAddressOfRawData;
+    require(rawLength64 <= SIZE_MAX, "Zero-TLS raw template is too large");
+    const auto rawLength = static_cast<std::size_t>(rawLength64);
+    const auto rawRva64 = tls.StartAddressOfRawData - nt->OptionalHeader.ImageBase;
+    require(rawRva64 <= UINT32_MAX, "Zero-TLS raw-template RVA overflows");
+    const auto rawOffset = rvaToFileOffset(static_cast<std::uint32_t>(rawRva64), rawLength);
+    require(std::all_of(bytes.begin() + rawOffset, bytes.begin() + rawOffset + rawLength,
+                [](std::byte value) { return value == std::byte{}; }),
+        "Zero-TLS regression fixture raw template is not entirely zero");
+
+    try {
+        auto module = pe::PeLoader::load(bytes);
+        (void)module;
+    } catch (const pe::PeError& error) {
+        require(error.code() == pe::PeErrorCode::StaticTlsUnsupported,
+            "Zero-initialized static TLS failed with the wrong structured error");
+        return 0;
+    }
+    throw std::runtime_error("All-zero static TLS was silently accepted");
+}
+
+int basicStaticTlsUnsupported(const std::filesystem::path& path) {
+    constexpr std::uint64_t initial = 0x1234567812345678ULL;
+    using Read = std::uint64_t (*)();
+    using Write = void (*)(std::uint64_t);
+    using Address = std::uintptr_t (*)();
+    {
+        NativeModule native(path);
+        const auto read = native.get<Read>("ReadTlsValue");
+        const auto write = native.get<Write>("WriteTlsValue");
+        const auto address = native.get<Address>("AddressOfTlsValue");
+        require(read() == initial, "Native initialized TLS value is wrong");
+        require(address() == address(), "Native same-thread TLS address changed");
+        write(0x8877665544332211ULL);
+        require(read() == 0x8877665544332211ULL, "Native TLS mutation failed");
+    }
+
+    try {
+        auto module = pe::PeLoader::load(readFile(path));
+        (void)module;
+    } catch (const pe::PeError& error) {
+        require(error.code() == pe::PeErrorCode::StaticTlsUnsupported,
+            "Basic static TLS failed with the wrong structured error");
+        return 0;
+    }
+    throw std::runtime_error("Basic compiler-generated static TLS was silently accepted");
+}
+
+int tlsAllocAbiProbe(const std::filesystem::path& path) {
+    constexpr std::uint64_t initial = 0x1234567812345678ULL;
+    NativeModule native(path);
+    const auto addressOfValue = native.get<std::uintptr_t (*)()>("AddressOfTlsValue");
+
+    const auto* base = reinterpret_cast<const std::byte*>(native.handle);
+    const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(base);
+    require(dos->e_magic == IMAGE_DOS_SIGNATURE, "ABI probe native image has no DOS header");
+    const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS64*>(base + dos->e_lfanew);
+    const auto directory = nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_TLS];
+    require(directory.VirtualAddress != 0 && directory.Size >= sizeof(IMAGE_TLS_DIRECTORY64),
+        "ABI probe native image has no TLS directory");
+    const auto* tls = reinterpret_cast<const IMAGE_TLS_DIRECTORY64*>(base + directory.VirtualAddress);
+    require(tls->EndAddressOfRawData > tls->StartAddressOfRawData && tls->AddressOfIndex != 0,
+        "ABI probe native image has no compiler static TLS");
+    const auto rawSize = static_cast<std::size_t>(tls->EndAddressOfRawData - tls->StartAddressOfRawData);
+    const auto* raw = reinterpret_cast<const std::byte*>(tls->StartAddressOfRawData);
+    std::array<std::byte, sizeof(initial)> needle{};
+    std::memcpy(needle.data(), &initial, sizeof(initial));
+    const auto valuePosition = std::search(raw, raw + rawSize, needle.begin(), needle.end());
+    require(valuePosition != raw + rawSize, "ABI probe could not locate its initialized TLS scalar");
+    const auto valueOffset = static_cast<std::size_t>(valuePosition - raw);
+
+    std::vector<DWORD> allocatedIndices;
+    DWORD dynamicIndex = TLS_OUT_OF_INDEXES;
+    auto* staticIndexSlot = reinterpret_cast<DWORD*>(tls->AddressOfIndex);
+    const DWORD originalStaticIndex = *staticIndexSlot;
+    for (int attempt = 0; attempt < 4; ++attempt) {
+        const DWORD candidate = ::TlsAlloc();
+        require(candidate != TLS_OUT_OF_INDEXES, "TlsAlloc failed during ABI probe");
+        allocatedIndices.push_back(candidate);
+        if (candidate != originalStaticIndex) {
+            dynamicIndex = candidate;
+            break;
+        }
+    }
+    require(dynamicIndex != TLS_OUT_OF_INDEXES,
+        "ABI probe could not obtain an index distinct from the native static index");
+
+    std::vector<std::byte> dynamicBlock(rawSize + tls->SizeOfZeroFill);
+    std::memcpy(dynamicBlock.data(), raw, rawSize);
+    require(::TlsSetValue(dynamicIndex, dynamicBlock.data()) != FALSE,
+        "TlsSetValue failed during ABI probe");
+    require(::TlsGetValue(dynamicIndex) == dynamicBlock.data(),
+        "TlsGetValue did not return the block installed by the ABI probe");
+
+    *staticIndexSlot = dynamicIndex;
+    const auto generatedAddress = addressOfValue();
+    *staticIndexSlot = originalStaticIndex;
+    for (const DWORD index : allocatedIndices) (void)::TlsFree(index);
+
+    const auto dynamicTlsApiAddress =
+        reinterpret_cast<std::uintptr_t>(dynamicBlock.data() + valueOffset);
+    require(generatedAddress != dynamicTlsApiAddress,
+        "TlsSetValue unexpectedly populated the PE loader static-TLS vector; revisit the architecture result");
+    require(addressOfValue() != 0, "Restoring the native static TLS index failed");
+    return 0;
 }
 
 int exceptionTest(const std::filesystem::path& path) {
@@ -467,6 +625,9 @@ int wmain(int argc, wchar_t** argv) {
         if (mode == "forwarded") return forwarded(path);
         if (mode == "tls") return tls(path);
         if (mode == "static_tls") return staticTls(path);
+        if (mode == "zero_static_tls_detection") return zeroStaticTlsDetection(path);
+        if (mode == "basic_static_tls_unsupported") return basicStaticTlsUnsupported(path);
+        if (mode == "tls_alloc_abi_probe") return tlsAllocAbiProbe(path);
         if (mode == "exception") return exceptionTest(path);
         if (mode == "constructors") return constructors(path);
         if (mode == "delay") return delayImport(path);

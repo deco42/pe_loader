@@ -1,7 +1,7 @@
 # PE Loader
 
 Windows PE Loader is a C++20 library for loading an AMD64 PE32+ DLL from an
-exisiting byte buffer into the current process. It validates the input, maps the
+existing byte buffer into the current process. It validates the input, maps the
 virtual image, resolves dependencies with the Windows loader, initializes the
 DLL, exposes its exports, and tears it down through an RAII handle.
 

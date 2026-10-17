@@ -39,6 +39,28 @@ pe_test_dll(ZeroInitializedStaticTlsDll
 # explicitly zero-initialized variables, without static-CRT TLS sentinels.
 pe_apply_runtime(ZeroInitializedStaticTlsDll DYNAMIC)
 
+if(PELOADER_BUILD_TLS_RESEARCH)
+    function(pe_tls_research_dll target runtime_kind fixture_kind)
+        pe_test_dll(${target} modules/TlsResearch/TlsResearchDll.cpp)
+        pe_apply_runtime(${target} ${runtime_kind})
+        target_include_directories(${target} PRIVATE modules/TlsResearch)
+        target_compile_definitions(${target} PRIVATE TLS_RESEARCH_FIXTURE_KIND=${fixture_kind} ${ARGN})
+    endfunction()
+
+    pe_tls_research_dll(TlsScalarMT STATIC 1)
+    pe_tls_research_dll(TlsScalarMD DYNAMIC 1)
+    pe_tls_research_dll(TlsCppObjectMT STATIC 2 TLS_RESEARCH_HAS_OBJECT)
+    pe_tls_research_dll(TlsCppObjectMD DYNAMIC 2 TLS_RESEARCH_HAS_OBJECT)
+    pe_tls_research_dll(TlsLargeAligned STATIC 3 TLS_RESEARCH_HAS_LARGE)
+    pe_tls_research_dll(TlsMultipleObjects STATIC 4 TLS_RESEARCH_HAS_MULTIPLE)
+    pe_tls_research_dll(TlsDestructor STATIC 5 TLS_RESEARCH_HAS_OBJECT)
+    pe_tls_research_dll(TlsThreaded STATIC 6
+        TLS_RESEARCH_HAS_OBJECT TLS_RESEARCH_HAS_INTERNAL_THREAD)
+    pe_test_dll(TlsExternalThreadHelper
+        modules/TlsResearch/TlsExternalThreadHelper.cpp)
+    pe_apply_runtime(TlsExternalThreadHelper DYNAMIC)
+    target_include_directories(TlsExternalThreadHelper PRIVATE modules/TlsResearch)
+endif()
 pe_test_dll(ExceptionDll modules/ExceptionDll/ExceptionDll.cpp)
 pe_apply_runtime(ExceptionDll DYNAMIC)
 pe_test_dll(ExceptionDllMt modules/ExceptionDll/ExceptionDll.cpp)
@@ -110,3 +132,33 @@ pe_add_module_test(PeLoader.RepeatedLoadUnload repeat BasicDll)
 pe_add_module_test(PeLoader.InvalidPe invalid BasicDll)
 pe_add_module_test(PeLoader.CompareWithLoadLibrary compare ComplexCppDll)
 pe_add_module_test(PeLoader.ParallelLoad parallel BasicDll)
+
+if(PELOADER_BUILD_TLS_RESEARCH)
+    function(pe_add_tls_research_test name mode)
+        add_test(NAME ${name} COMMAND tls_state_probe ${mode} ${ARGN})
+    endfunction()
+
+    pe_add_tls_research_test(PeLoader.TlsResearch.ScalarMt lifecycle
+        "$<TARGET_FILE:TlsScalarMT>" 3)
+    pe_add_tls_research_test(PeLoader.TlsResearch.ScalarMd lifecycle
+        "$<TARGET_FILE:TlsScalarMD>" 3)
+    pe_add_tls_research_test(PeLoader.TlsResearch.CppObjectMt lifecycle
+        "$<TARGET_FILE:TlsCppObjectMT>" 3)
+    pe_add_tls_research_test(PeLoader.TlsResearch.CppObjectMd lifecycle
+        "$<TARGET_FILE:TlsCppObjectMD>" 3)
+    pe_add_tls_research_test(PeLoader.TlsResearch.LargeAligned lifecycle
+        "$<TARGET_FILE:TlsLargeAligned>" 3)
+    pe_add_tls_research_test(PeLoader.TlsResearch.MultipleObjects lifecycle
+        "$<TARGET_FILE:TlsMultipleObjects>" 3)
+    pe_add_tls_research_test(PeLoader.TlsResearch.Destructor lifecycle
+        "$<TARGET_FILE:TlsDestructor>" 3)
+    pe_add_tls_research_test(PeLoader.TlsResearch.Threaded lifecycle
+        "$<TARGET_FILE:TlsThreaded>" 3)
+    pe_add_tls_research_test(PeLoader.TlsResearch.ExternalThread external
+        "$<TARGET_FILE:TlsCppObjectMT>" "$<TARGET_FILE:TlsExternalThreadHelper>")
+    pe_add_tls_research_test(PeLoader.TlsResearch.MultipleModules multi
+        "$<TARGET_FILE:TlsScalarMT>" "$<TARGET_FILE:TlsScalarMD>"
+        "$<TARGET_FILE:TlsLargeAligned>" "$<TARGET_FILE:TlsMultipleObjects>")
+    pe_add_tls_research_test(PeLoader.TlsResearch.VectorGrowth growth
+        "$<TARGET_FILE:TlsScalarMT>" 72)
+endif()

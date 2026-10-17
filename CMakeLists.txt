@@ -19,6 +19,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 include(CTest)
 
 option(PELOADER_BUILD_TESTS "Build PE loader tests and fixture DLLs" ON)
+option(PELOADER_BUILD_TLS_RESEARCH "Build isolated normal-loader TLS research probes" ON)
 option(PELOADER_ENABLE_VERBOSE_LOGGING "Enable loader diagnostics through OutputDebugString" OFF)
 set(PELOADER_MSVC_RUNTIME "STATIC" CACHE STRING "MSVC runtime for the loader and test driver: STATIC or DYNAMIC")
 set_property(CACHE PELOADER_MSVC_RUNTIME PROPERTY STRINGS STATIC DYNAMIC)

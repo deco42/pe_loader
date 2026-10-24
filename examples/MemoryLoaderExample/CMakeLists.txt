@@ -1,0 +1,5 @@
+add_executable(memory_loader_example main.cpp)
+target_link_libraries(memory_loader_example PRIVATE PeLoader::PeLoader)
+target_compile_options(memory_loader_example PRIVATE /W4 /permissive- /EHsc /utf-8)
+target_compile_definitions(memory_loader_example PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+pe_apply_runtime(memory_loader_example ${PELOADER_MSVC_RUNTIME})

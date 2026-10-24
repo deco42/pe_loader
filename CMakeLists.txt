@@ -18,6 +18,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 include(CTest)
 
+option(PELOADER_BUILD_EXAMPLES "Build the memory-loader example" ON)
 option(PELOADER_BUILD_TESTS "Build PE loader tests and fixture DLLs" ON)
 option(PELOADER_BUILD_TLS_RESEARCH "Build isolated normal-loader TLS research probes" ON)
 option(PELOADER_ENABLE_VERBOSE_LOGGING "Enable loader diagnostics through OutputDebugString" OFF)
@@ -43,6 +44,10 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 
 add_subdirectory(src)
+
+if(PELOADER_BUILD_EXAMPLES)
+    add_subdirectory(examples)
+endif()
 
 if(BUILD_TESTING AND PELOADER_BUILD_TESTS)
     add_subdirectory(tests)

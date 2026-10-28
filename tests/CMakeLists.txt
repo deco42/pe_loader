@@ -162,3 +162,18 @@ if(PELOADER_BUILD_TLS_RESEARCH)
     pe_add_tls_research_test(PeLoader.TlsResearch.VectorGrowth growth
         "$<TARGET_FILE:TlsScalarMT>" 72)
 endif()
+
+function(pe_add_production_tls_rejection_test name dll_name)
+    set(dll_path "${PROJECT_SOURCE_DIR}/Prod_dlls/${dll_name}")
+    if(EXISTS "${dll_path}")
+        add_test(NAME ${name} COMMAND pe_loader_tests production_static_tls_unsupported "${dll_path}")
+        set_tests_properties(${name} PROPERTIES WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}/Prod_dlls")
+    endif()
+endfunction()
+
+pe_add_production_tls_rejection_test(
+    PeLoader.Tls.Production.Annotation.ExpectedUnsupported cobo_annotation_module.dll)
+pe_add_production_tls_rejection_test(
+    PeLoader.Tls.Production.Memory.ExpectedUnsupported cobo_memory_module.dll)
+pe_add_production_tls_rejection_test(
+    PeLoader.Tls.Production.Nodes.ExpectedUnsupported cobo_nodes_module.dll)

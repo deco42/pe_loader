@@ -310,6 +310,26 @@ int tlsAllocAbiProbe(const std::filesystem::path& path) {
     return 0;
 }
 
+int productionStaticTlsUnsupported(const std::filesystem::path& path) {
+    {
+        NativeModule native(path);
+        if (const auto abiAddress = ::GetProcAddress(native.handle, "CoboModule_AbiVersion");
+            abiAddress != nullptr) {
+            const auto abiVersion = reinterpret_cast<std::uint32_t (*)()>(abiAddress);
+            require(abiVersion() == 2, "Production DLL returned an unexpected safe ABI version");
+        }
+    }
+    try {
+        auto module = pe::PeLoader::load(readFile(path));
+        (void)module;
+    } catch (const pe::PeError& error) {
+        require(error.code() == pe::PeErrorCode::StaticTlsUnsupported,
+            "Production static TLS failed with the wrong structured error");
+        return 0;
+    }
+    throw std::runtime_error("Production static TLS was accepted without loader integration");
+}
+
 int exceptionTest(const std::filesystem::path& path) {
     NativeModule native(path);
     require(native.get<int (*)()>("RunExceptionTest")() == 1, "Native exception test failed");
@@ -628,6 +648,7 @@ int wmain(int argc, wchar_t** argv) {
         if (mode == "zero_static_tls_detection") return zeroStaticTlsDetection(path);
         if (mode == "basic_static_tls_unsupported") return basicStaticTlsUnsupported(path);
         if (mode == "tls_alloc_abi_probe") return tlsAllocAbiProbe(path);
+        if (mode == "production_static_tls_unsupported") return productionStaticTlsUnsupported(path);
         if (mode == "exception") return exceptionTest(path);
         if (mode == "constructors") return constructors(path);
         if (mode == "delay") return delayImport(path);
